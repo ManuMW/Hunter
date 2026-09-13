@@ -26,12 +26,17 @@ For domain terminology and architectural decisions, see:
 - [ADR 0002: Air-Gapped Sandbox Network](file:///D:/Unga/docs/adr/0002-air-gapped-sandbox-network.md)
 - [ADR 0003: Standalone Velociraptor CLI Triage](file:///D:/Unga/docs/adr/0003-standalone-velociraptor-cli-triage.md)
 - [ADR 0004: Compute Engine Host over Cloud Run](file:///D:/Unga/docs/adr/0004-compute-engine-host-over-cloud-run.md)
+- [ADR 0005: Hash Ingestion via MalwareBazaar API](file:///D:/Unga/docs/adr/0005-hash-ingestion-via-malwarebazaar.md)
+- [ADR 0006: Report Caching and Hybrid Rate Limiting](file:///D:/Unga/docs/adr/0006-report-caching-and-hybrid-rate-limiting.md)
 
 ---
 
 ## Features
 
-- **Safe Ingestion**: Calculates SHA-256, SHA-1, MD5, detects file types via magic bytes, and strips executable bits (`chmod 0600`).
+- **SHA-256 Hash Submission**: Accepts hashes instead of raw user uploads, completely eliminating file upload vulnerabilities.
+- **MalwareBazaar (abuse.ch) Acquisition**: Queries pre-flight metadata, enforces Linux-only threat verification (ELF/scripts), and downloads encrypted samples using the standard `infected` archive password.
+- **Instant Cache Hits & In-Flight Deduplication**: Returns pre-existing reports instantly without re-detonating or consuming daily quota.
+- **Fair-Use Rate Limiting**: Enforces a strict limit of 5 fresh detonations per client per calendar day (UTC) tracked in SQLite, combined with Cloudflare Turnstile bot protection.
 - **GCP Abuse Immunity**: Detonates with Docker `--network none`. Zero network packets leave the container, completely preventing GCP billing account suspension.
 - **Resource Guardrails**: Enforces `--memory=512m`, `--cpus=1.0`, and `--pids-limit=100` to prevent fork bombs and host starvation.
 - **DFIR Telemetry via Velociraptor**: Captures spawned process trees, cron persistence, systemd hooks, and `/tmp` drops.

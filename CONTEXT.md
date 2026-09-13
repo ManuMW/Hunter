@@ -33,8 +33,24 @@ The Linux compute instance in GCP that runs the Docker daemon, orchestration wor
 _Avoid_: Server, machine, box, VM
 
 **Submission Interface**:
-The web form on the Report Hub that allows a user to select and transmit a sample directly from the browser to the Detonation Host.
+The web form on the Report Hub that allows a user to submit a sample's SHA-256 hash to the Detonation Host.
 _Avoid_: Uploader, form, upload page, frontend API
+
+**Hash Submission**:
+A user request containing a sample's SHA-256 hash submitted for automated acquisition, triage, and analysis.
+_Avoid_: Upload, scan request, file post
+
+**Upstream Repository**:
+The MalwareBazaar (abuse.ch) repository queried by the Detonation Host to acquire encrypted Linux malware samples.
+_Avoid_: Download site, external database, malware site
+
+**Report Cache**:
+The local storage layer that returns previously generated Threat Analysis Reports instantly without re-executing a Detonation Run.
+_Avoid_: Database, cache store, report memory
+
+**Client Quota**:
+The maximum allowance of 5 new sample detonations permitted per client identifier per 24-hour UTC window.
+_Avoid_: Rate limit, token bucket, max requests
 
 **Quarantine Store**:
 A restricted directory on the Detonation Host that stores samples under their SHA256 hash with non-executable permissions (`chmod 0600`).

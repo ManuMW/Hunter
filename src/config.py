@@ -22,6 +22,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 DETONATION_TIMEOUT = int(os.getenv("DETONATION_TIMEOUT", "90"))
 SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "threat-sandbox:latest")
 
+# MalwareBazaar (abuse.ch) Configuration
+MALWAREBAZAAR_API_KEY = os.getenv("MALWAREBAZAAR_API_KEY", "")
+MALWAREBAZAAR_API_URL = "https://mb-api.abuse.ch/api/v1/"
+
+# Rate Limiting and Bot Protection
+CLIENT_DAILY_QUOTA = int(os.getenv("CLIENT_DAILY_QUOTA", "5"))
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "")
+DATABASE_PATH = BASE_DIR / "detonation_quotas.db"
+
 # Storage Directories
 QUARANTINE_DIR = BASE_DIR / os.getenv("QUARANTINE_DIR", "quarantine")
 REPORTS_DIR = BASE_DIR / os.getenv("REPORTS_DIR", "reports")

@@ -8,7 +8,15 @@ from src.runner import run_detonation
 from src.triage import extract_triage_data
 from src.ai_synthesis import synthesize_threat_report
 from src.report_generator import generate_threat_report
-from src.config import REPORTS_DIR
+from src.config import REPORTS_DIR, CLIENT_DAILY_QUOTA
+from src.malwarebazaar import (
+    get_sample_info,
+    download_sample_binary,
+    MalwareBazaarUnavailableError,
+    SampleNotFoundError,
+    UnsupportedArchitectureError
+)
+from src.rate_limiter import check_client_quota, consume_client_quota
 
 
 def cmd_submit(args):
@@ -27,13 +35,63 @@ def cmd_submit(args):
     print(f"    - Size: {sample_meta['size_bytes']} bytes")
     print(f"    - Quarantine Location: {sample_meta['quarantine_path']}")
 
-    print(f"[*] Starting Detonation Run (Timeout: {args.timeout}s)...")
+    _execute_detonation_flow(sample_meta, args.timeout, args.mock)
+
+
+def cmd_submit_hash(args):
+    sha256 = args.sha256.strip().lower()
+    
+    # 1. Check Report Cache
+    cached_report = REPORTS_DIR / f"{sha256}.md"
+    if cached_report.exists() and not args.force:
+        print(f"[+] Instant Cache Hit! Threat Analysis Report already exists for SHA256: {sha256}")
+        print(f"    Report File: {cached_report}")
+        return
+
+    # 2. Check local quota
+    allowed, used, remaining = check_client_quota("cli:localhost")
+    if not allowed and not args.force:
+        print(f"[!] Daily quota exceeded ({used}/{CLIENT_DAILY_QUOTA} detonations used today). Use --force to override in CLI.")
+        sys.exit(1)
+
+    # 3. Pre-flight check on MalwareBazaar
+    print(f"[*] Querying MalwareBazaar for SHA-256: {sha256}...")
+    try:
+        sample_info = get_sample_info(sha256)
+    except (SampleNotFoundError, UnsupportedArchitectureError, MalwareBazaarUnavailableError, ValueError) as err:
+        print(f"[!] {err}")
+        sys.exit(1)
+
+    print(f"    - Filename: {sample_info['filename']}")
+    print(f"    - Type: {sample_info['file_type']}")
+    print(f"    - Signature: {sample_info['signature']}")
+    print(f"    - Tags: {', '.join(sample_info['tags'])}")
+
+    # 4. Download and Decrypt Sample
+    print("[*] Downloading and decrypting sample from MalwareBazaar...")
+    try:
+        raw_binary = download_sample_binary(sha256)
+    except MalwareBazaarUnavailableError as mbue:
+        print(f"[!] {mbue}")
+        sys.exit(1)
+
+    # 5. Quarantine
+    sample_meta = quarantine_sample(raw_binary, sample_info["filename"])
+    print(f"[+] Sample stored in Quarantine Store: {sample_meta['quarantine_path']}")
+
+    # 6. Detonate
+    _execute_detonation_flow(sample_meta, args.timeout, args.mock)
+    consume_client_quota("cli:localhost")
+
+
+def _execute_detonation_flow(sample_meta, timeout, mock):
+    print(f"[*] Starting Detonation Run (Timeout: {timeout}s)...")
     t0 = time.time()
     detonation_res = run_detonation(
         sample_path=sample_meta["quarantine_path"],
         sha256=sample_meta["sha256"],
-        timeout_seconds=args.timeout,
-        mock_run=args.mock
+        timeout_seconds=timeout,
+        mock_run=mock
     )
     print(f"    - Status: {detonation_res['status']} ({time.time() - t0:.1f}s)")
 
@@ -53,6 +111,13 @@ def cmd_submit(args):
     report_md = generate_threat_report(sample_meta, triage_data, synthesis)
     report_file = REPORTS_DIR / f"{sample_meta['sha256']}.md"
     print(f"[+] Report generated successfully at: {report_file}")
+
+
+def cmd_quota(args):
+    allowed, used, remaining = check_client_quota("cli:localhost")
+    print("[*] Daily Detonation Quota Status (CLI):")
+    print(f"    - Used Today: {used} / {CLIENT_DAILY_QUOTA}")
+    print(f"    - Remaining Today: {remaining}")
 
 
 def cmd_list(args):
@@ -84,12 +149,24 @@ def main():
     parser = argparse.ArgumentParser(description="Threat Research Pipeline CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # submit
-    p_submit = subparsers.add_parser("submit", help="Submit and detonate a sample locally")
+    # submit-hash
+    p_hash = subparsers.add_parser("submit-hash", help="Acquire sample by SHA-256 from MalwareBazaar and detonate")
+    p_hash.add_argument("sha256", help="SHA-256 hash of the Linux malware sample")
+    p_hash.add_argument("--timeout", type=int, default=90, help="Detonation timeout in seconds (default: 90)")
+    p_hash.add_argument("--mock", action="store_true", help="Force mock detonation without running Docker")
+    p_hash.add_argument("--force", action="store_true", help="Bypass cache and quota checks")
+    p_hash.set_defaults(func=cmd_submit_hash)
+
+    # submit file
+    p_submit = subparsers.add_parser("submit", help="Submit and detonate a local sample binary")
     p_submit.add_argument("file", help="Path to sample file to analyze")
     p_submit.add_argument("--timeout", type=int, default=90, help="Detonation timeout in seconds (default: 90)")
     p_submit.add_argument("--mock", action="store_true", help="Force mock detonation without running Docker")
     p_submit.set_defaults(func=cmd_submit)
+
+    # quota
+    p_quota = subparsers.add_parser("quota", help="Inspect remaining daily detonation quota")
+    p_quota.set_defaults(func=cmd_quota)
 
     # list
     p_list = subparsers.add_parser("list", help="List all generated threat reports")
