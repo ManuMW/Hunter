@@ -34,6 +34,7 @@ def test_submit_hash_cache_hit(tmp_path, monkeypatch):
 def test_submit_hash_missing_mb_key_returns_503(tmp_path, monkeypatch):
     """Verifies that when MalwareBazaar key is missing, API returns 503 out-of-order notification."""
     monkeypatch.setattr("src.api.REPORTS_DIR", tmp_path)
+    monkeypatch.setattr("src.malwarebazaar.MALWAREBAZAAR_AUTH_KEY", "")
     monkeypatch.setattr("src.malwarebazaar.MALWAREBAZAAR_API_KEY", "")
     sha256 = "1111111111111111111111111111111111111111111111111111111111111111"
 

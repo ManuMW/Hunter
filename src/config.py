@@ -16,14 +16,15 @@ if env_file.exists():
 
 # Google AI Studio Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 # Detonation Configuration
 DETONATION_TIMEOUT = int(os.getenv("DETONATION_TIMEOUT", "90"))
 SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "threat-sandbox:latest")
 
 # MalwareBazaar (abuse.ch) Configuration
-MALWAREBAZAAR_API_KEY = os.getenv("MALWAREBAZAAR_API_KEY", "")
+MALWAREBAZAAR_AUTH_KEY = os.getenv("MALWAREBAZAAR_AUTH_KEY") or os.getenv("MALWAREBAZAAR_API_KEY") or ""
+MALWAREBAZAAR_API_KEY = MALWAREBAZAAR_AUTH_KEY  # Backwards-compatible alias
 MALWAREBAZAAR_API_URL = "https://mb-api.abuse.ch/api/v1/"
 
 # Rate Limiting and Bot Protection

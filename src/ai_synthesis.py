@@ -40,6 +40,67 @@ class ThreatAnalysisSynthesis(BaseModel):
     confidence_score: float = Field(ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0")
 
 
+GEMINI_RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "malware_family": {"type": "STRING", "description": "Identified or suspected malware family"},
+        "threat_severity_score": {"type": "INTEGER", "description": "Severity rating from 1 to 10"},
+        "threat_classification": {"type": "STRING", "description": "High-level classification (Cryptominer, Trojan, Botnet, Rootkit, or Benign)"},
+        "executive_summary": {"type": "STRING", "description": "2-3 paragraphs synthesizing sample behavior and risks"},
+        "mitre_attack_techniques": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "technique_id": {"type": "STRING"},
+                    "technique_name": {"type": "STRING"},
+                    "tactic": {"type": "STRING"},
+                    "evidence": {"type": "STRING"}
+                },
+                "required": ["technique_id", "technique_name", "tactic", "evidence"]
+            }
+        },
+        "observed_behaviors": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "category": {"type": "STRING"},
+                    "description": {"type": "STRING"},
+                    "evidence": {"type": "STRING"}
+                },
+                "required": ["category", "description", "evidence"]
+            }
+        },
+        "indicators_of_compromise": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "type": {"type": "STRING"},
+                    "value": {"type": "STRING"},
+                    "description": {"type": "STRING"}
+                },
+                "required": ["type", "value", "description"]
+            }
+        },
+        "yara_rule_candidate": {"type": "STRING", "description": "Suggested YARA rule candidate for detection"},
+        "confidence_score": {"type": "NUMBER", "description": "Confidence score from 0.0 to 1.0"}
+    },
+    "required": [
+        "malware_family",
+        "threat_severity_score",
+        "threat_classification",
+        "executive_summary",
+        "mitre_attack_techniques",
+        "observed_behaviors",
+        "indicators_of_compromise",
+        "yara_rule_candidate",
+        "confidence_score"
+    ]
+}
+
+
 def synthesize_threat_report(
     sample_meta: Dict[str, Any],
     triage_data: Dict[str, Any],
@@ -100,7 +161,7 @@ Instructions:
         ],
         "generationConfig": {
             "response_mime_type": "application/json",
-            "response_schema": ThreatAnalysisSynthesis.model_json_schema()
+            "response_schema": GEMINI_RESPONSE_SCHEMA
         }
     }
     
