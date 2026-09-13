@@ -121,10 +121,39 @@ def generate_threat_report(
     else:
         report_lines.append(f"| `sha256` | `{sha256}` | Primary Sample SHA-256 |")
 
+    # Dropped Payloads Decomposition Section
+    if synthesis.dropped_payload_analyses:
+        report_lines.extend([
+            "",
+            "## 6. Dropped Payloads & Multi-Stage Attack Decomposition",
+            "",
+            "> [!NOTE]",
+            "> All executable sub-payloads staged during execution have been quarantined on the Detonation Host and are available for standalone detonation.",
+            "",
+            "| Dropped File | Operational Role | File Type | SHA-256 | Quarantine Status |",
+            "| :--- | :--- | :--- | :--- | :--- |"
+        ])
+        for p in synthesis.dropped_payload_analyses:
+            report_lines.append(
+                f"| `{p.filename}` | `{p.role}` | `{p.file_type}` | `{p.sha256}` | `Quarantined (Detonatable)` |"
+            )
+        
+        report_lines.extend(["", "### Sub-Payload Analysis Deep-Dive", ""])
+        for p in synthesis.dropped_payload_analyses:
+            report_lines.extend([
+                f"#### Target: `{p.filename}` ({p.role})",
+                f"- **SHA-256**: `{p.sha256}`",
+                f"- **File Type**: `{p.file_type}`",
+                f"- **Behavioral Role**: {p.analysis}",
+            ])
+            if p.embedded_indicators:
+                report_lines.append(f"- **Extracted Indicators / Configs**: {', '.join(f'`{defang_ioc(i)}`' for i in p.embedded_indicators)}")
+            report_lines.append("")
+
     # Add forensic dump section
     report_lines.extend([
         "",
-        "## 6. Detailed Sandbox Forensic Triage",
+        "## 7. Detailed Sandbox Forensic Triage",
         "",
         "### Spawned Process Tree",
         "```text"
@@ -163,7 +192,7 @@ def generate_threat_report(
     # YARA Rule
     report_lines.extend([
         "",
-        "## 7. YARA Detection Rule",
+        "## 8. YARA Detection Rule",
         "",
         "```yara",
         synthesis.yara_rule_candidate.strip(),

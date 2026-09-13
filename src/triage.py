@@ -1,8 +1,12 @@
+import hashlib
 import json
 import logging
+import re
 import zipfile
 from pathlib import Path
 from typing import Dict, Any, List
+
+from src.quarantine import detect_file_type, quarantine_sample
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +15,65 @@ BASELINE_PROCESS_NAMES = {
     "systemd", "kthreadd", "rcu_gp", "kworker", "bash", "sh",
     "entrypoint.sh", "velociraptor", "ps", "sleep", "pgrep", "pkill"
 }
+
+
+def extract_printable_strings(content: bytes, min_len: int = 4) -> List[str]:
+    """Extracts printable ASCII strings and isolates suspicious indicators."""
+    pattern = rb"[ -~]{" + str(min_len).encode() + rb",}"
+    matches = re.findall(pattern, content)
+    strings = [m.decode("ascii", errors="ignore") for m in matches]
+    interesting = []
+    for s in strings:
+        if any(marker in s for marker in [":", "/", ".", "http", "pool", "miner", "wallet", "cron", "bash", "root"]):
+            if s not in interesting:
+                interesting.append(s)
+    return interesting[:30] if interesting else strings[:20]
+
+
+def analyze_dropped_payloads(output_dir: Path) -> List[Dict[str, Any]]:
+    """
+    Discovers, hashes, and statically inspects raw dropped files exported from the sandbox.
+    Automatically registers executable binaries into the Quarantine Store for standalone detonation.
+    """
+    dropped_dir = output_dir / "dropped"
+    payloads = []
+    if not dropped_dir.exists():
+        return payloads
+
+    for file_path in dropped_dir.rglob("*"):
+        if file_path.is_file():
+            try:
+                content = file_path.read_bytes()
+                sha256 = hashlib.sha256(content).hexdigest()
+                md5 = hashlib.md5(content).hexdigest()
+                file_type = detect_file_type(content[:1024])
+                rel_path = "/" + str(file_path.relative_to(dropped_dir)).replace("\\", "/")
+
+                parsed_content = None
+                if file_path.suffix == ".json" or content.strip().startswith(b"{"):
+                    try:
+                        parsed_content = json.loads(content.decode("utf-8", errors="ignore"))
+                    except Exception:
+                        pass
+
+                # If binary or script, automatically quarantine for standalone detonation
+                if "ELF" in file_type or "Script" in file_type or file_path.name.startswith("."):
+                    quarantine_sample(content, file_path.name)
+
+                payloads.append({
+                    "filename": file_path.name,
+                    "target_path": rel_path,
+                    "sha256": sha256,
+                    "md5": md5,
+                    "size_bytes": len(content),
+                    "file_type": file_type,
+                    "extracted_strings": extract_printable_strings(content),
+                    "parsed_config": parsed_content
+                })
+            except Exception as e:
+                logger.warning(f"Failed to inspect dropped file {file_path}: {e}")
+
+    return payloads
 
 
 def parse_native_processes(content: str) -> List[Dict[str, str]]:
@@ -140,10 +203,14 @@ def extract_triage_data(output_dir: str) -> Dict[str, Any]:
         except Exception:
             pass
 
+    # 4. Decompose raw dropped payloads
+    dropped_payloads = analyze_dropped_payloads(out_path)
+
     return {
         "execution_summary": run_summary,
         "spawned_processes": spawned_processes,
         "dropped_files": dropped_files,
+        "dropped_payloads": dropped_payloads,
         "persistence_hooks": persistence_entries,
         "network_indicators": network_indicators,
         "raw_artifacts_available": artifacts_zip.exists()

@@ -162,6 +162,18 @@ def _run_mock_detonation(
         f.write("123456  4 -rwxr-xr-x  1 root root  2048 Sep 13 14:00 /tmp/.hidden_miner\n")
         f.write("123457  4 -rw-r--r--  1 root root   128 Sep 13 14:00 /tmp/config.json\n")
         
+    # Write actual raw simulated files to dropped/ directory
+    dropped_tmp = output_dir / "dropped" / "tmp"
+    dropped_tmp.mkdir(parents=True, exist_ok=True)
+    
+    # Mock ELF binary for .hidden_miner
+    with open(dropped_tmp / ".hidden_miner", "wb") as f:
+        f.write(b"\x7fELF\x02\x01\x01\x00" + b"\x00" * 200 + b"POOL: 198.51.100.23:4444\x00WALLET: 48edfHu7V9Z84YzzMa6fUUEoXZ83BHM7YG51jRtPZ\x00")
+        
+    # Mock config.json
+    with open(dropped_tmp / "config.json", "w", encoding="utf-8") as f:
+        f.write('{\n  "pool": "198.51.100.23:4444",\n  "wallet": "48edfHu7V9Z84YzzMa6fUUEoXZ83BHM7YG51jRtPZ",\n  "pass": "x"\n}\n')
+        
     return {
         "status": "completed",
         "exit_code": 0,

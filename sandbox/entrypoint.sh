@@ -64,6 +64,15 @@ echo "[*] Execution phase completed in ${DURATION}s. Initiating forensic triage.
 kill -9 "${SAMPLE_PID}" 2>/dev/null || true
 pkill -9 -P "${SAMPLE_PID}" 2>/dev/null || true
 
+# Export raw dropped files from staging paths
+mkdir -p "${OUTPUT_DIR}/dropped"
+find /tmp /var/tmp /dev/shm -maxdepth 3 -type f 2>/dev/null | while read -r f; do
+    rel_path=$(echo "$f" | sed 's|^/||')
+    dest_dir="${OUTPUT_DIR}/dropped/$(dirname "$rel_path")"
+    mkdir -p "$dest_dir"
+    cp "$f" "${OUTPUT_DIR}/dropped/$rel_path" 2>/dev/null || true
+done
+
 # Extract Forensic Artifacts via Velociraptor
 TMP_COLLECT_DIR=$(mktemp -d)
 mkdir -p "${TMP_COLLECT_DIR}/artifacts"

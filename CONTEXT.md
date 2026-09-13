@@ -59,3 +59,7 @@ _Avoid_: Uploads folder, storage, file store, bucket
 **Detonation Worker**:
 An asynchronous background worker that sequentially dequeues samples, executes the Detonation Run, extracts Forensic Artifacts, and triggers AI synthesis.
 _Avoid_: Runner, processor, task runner, job queue
+
+**Dropped Payload**:
+A secondary executable, script, or configuration file staged on the filesystem by a sample during execution.
+_Avoid_: Secondary file, child payload, dropped file, drop

@@ -28,6 +28,15 @@ class IndicatorOfCompromise(BaseModel):
     description: str = Field(description="Context or role of the indicator")
 
 
+class DroppedPayloadAnalysis(BaseModel):
+    filename: str = Field(description="Name of the dropped file or binary")
+    sha256: str = Field(description="SHA-256 hash of the dropped file")
+    file_type: str = Field(description="File type (e.g., Linux ELF, Shell Script, JSON Configuration)")
+    role: str = Field(description="Operational role, e.g., Mining Worker, Dropper Stage 2, Persistence Hook, Configuration")
+    analysis: str = Field(description="In-depth explanation of what this dropped payload does and how it interacts with the parent")
+    embedded_indicators: List[str] = Field(default_factory=list, description="Extracted IPs, URLs, or configuration keys")
+
+
 class ThreatAnalysisSynthesis(BaseModel):
     malware_family: str = Field(description="Identified or suspected malware family or type")
     threat_severity_score: int = Field(ge=1, le=10, description="Severity rating from 1 (Benign) to 10 (Critical)")
@@ -36,6 +45,7 @@ class ThreatAnalysisSynthesis(BaseModel):
     mitre_attack_techniques: List[MitreTechnique] = Field(default_factory=list)
     observed_behaviors: List[ObservedBehavior] = Field(default_factory=list)
     indicators_of_compromise: List[IndicatorOfCompromise] = Field(default_factory=list)
+    dropped_payload_analyses: List[DroppedPayloadAnalysis] = Field(default_factory=list)
     yara_rule_candidate: str = Field(description="Suggested YARA rule candidate for detection")
     confidence_score: float = Field(ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0")
 
@@ -84,6 +94,24 @@ GEMINI_RESPONSE_SCHEMA = {
                 "required": ["type", "value", "description"]
             }
         },
+        "dropped_payload_analyses": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "filename": {"type": "STRING"},
+                    "sha256": {"type": "STRING"},
+                    "file_type": {"type": "STRING"},
+                    "role": {"type": "STRING"},
+                    "analysis": {"type": "STRING"},
+                    "embedded_indicators": {
+                        "type": "ARRAY",
+                        "items": {"type": "STRING"}
+                    }
+                },
+                "required": ["filename", "sha256", "file_type", "role", "analysis", "embedded_indicators"]
+            }
+        },
         "yara_rule_candidate": {"type": "STRING", "description": "Suggested YARA rule candidate for detection"},
         "confidence_score": {"type": "NUMBER", "description": "Confidence score from 0.0 to 1.0"}
     },
@@ -95,6 +123,7 @@ GEMINI_RESPONSE_SCHEMA = {
         "mitre_attack_techniques",
         "observed_behaviors",
         "indicators_of_compromise",
+        "dropped_payload_analyses",
         "yara_rule_candidate",
         "confidence_score"
     ]
@@ -134,6 +163,9 @@ Spawned Processes:
 
 Dropped Files in /tmp and staging locations:
 {json.dumps(triage_data.get('dropped_files', []), indent=2)}
+
+Dropped Payloads & Secondary Stages (Static Decomposition & Strings):
+{json.dumps(triage_data.get('dropped_payloads', []), indent=2)}
 
 Persistence Hooks (Cron / Systemd):
 {json.dumps(triage_data.get('persistence_hooks', []), indent=2)}
@@ -268,6 +300,20 @@ def _deterministic_fallback_synthesis(
         + "Indicators have been extracted and mapped to corresponding MITRE ATT&CK techniques."
     )
 
+    payload_analyses = []
+    for dp in triage_data.get("dropped_payloads", []):
+        is_sub_miner = "miner" in dp["filename"].lower() or any("miner" in s.lower() for s in dp.get("extracted_strings", []))
+        role = "Mining Worker / Secondary Stage" if is_sub_miner else "Auxiliary Script / Stager"
+        payload_analyses.append(DroppedPayloadAnalysis(
+            filename=dp["filename"],
+            sha256=dp["sha256"],
+            file_type=dp["file_type"],
+            role=role,
+            analysis=f"Extracted dropped payload staged at {dp.get('target_path')}. " +
+                     ("Configured with external pool parameters." if dp.get("parsed_config") else "Static analysis revealed embedded indicators."),
+            embedded_indicators=dp.get("extracted_strings", [])[:5]
+        ))
+
     return ThreatAnalysisSynthesis(
         malware_family=family,
         threat_severity_score=min(severity, 10),
@@ -276,6 +322,7 @@ def _deterministic_fallback_synthesis(
         mitre_attack_techniques=mitre,
         observed_behaviors=behaviors,
         indicators_of_compromise=iocs,
+        dropped_payload_analyses=payload_analyses,
         yara_rule_candidate=yara,
         confidence_score=0.85
     )
