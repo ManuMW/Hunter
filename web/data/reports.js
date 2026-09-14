@@ -5,6 +5,55 @@
 
 const THREAT_REPORTS = [
     {
+        id: "4ba17752a7fa6fb2afb70124ea1e8651999487d1f4ece5196ab1c37beee75718",
+        sha256: "4ba17752a7fa6fb2afb70124ea1e8651999487d1f4ece5196ab1c37beee75718",
+        title: "Static Binary Analysis: 25KB 32-bit x86 Linux ELF Botnet (Gafgyt) with Embedded C2 Endpoints",
+        family: "Gafgyt",
+        category: "BOTNET",
+        severity: "HIGH",
+        severityScore: "8/10",
+        date: "2026-09-14",
+        author: "Hunter Research Team",
+        readTime: "4 min read",
+        summary: "Static binary triage of 32-bit x86 Linux ELF executable 'i686' (25,600 bytes) identified indicators characteristic of the Gafgyt / BASHLITE botnet malware family. Embedded strings expose direct Command and Control (C2) IPv4 infrastructure (2.27.248.149) and public DNS connectivity checking (8.8.8.8), combined with low-level socket routines designed for DDoS attacks and remote command execution.",
+        tags: ["BOTNET", "GAFGYT", "DDOS", "C2", "X86"],
+        mitre: [
+            { id: "T1071.001", name: "Application Layer Protocol: Web Protocols", tactic: "Command and Control" },
+            { id: "T1095", name: "Non-Application Layer Protocol", tactic: "Command and Control" },
+            { id: "T1027", name: "Obfuscated Files or Information", tactic: "Defense Evasion" }
+        ],
+        iocs: [
+            { type: "SHA-256", value: "4ba17752a7fa6fb2afb70124ea1e8651999487d1f4ece5196ab1c37beee75718", description: "Primary 25KB x86 ELF botnet sample binary (i686)" },
+            { type: "SHA-1", value: "849176c24e9c9ed95150412a80b7fd18f7f1e24a", description: "SHA-1 cryptographic checksum" },
+            { type: "MD5", value: "905ca98775cb833bc54c4c69e9313ca4", description: "MD5 cryptographic checksum" },
+            { type: "Network C2", value: "2[.]27[.]248[.]149", description: "Suspected Command and Control (C2) / botnet master endpoint" },
+            { type: "Network Check", value: "8[.]8[.]8[.]8", description: "Google Public DNS endpoint utilized for connectivity checks" },
+            { type: "File Reference", value: "/dev/null", description: "Standard Linux null device referenced for suppressing output" }
+        ],
+        behavior: {
+            processTree: [
+                "[Static Binary Triage Mode] Analysis performed on raw 32-bit x86 ELF executable.",
+                "└── Target Architecture: Intel 80386 (i686), LSB executable, 25,600 bytes.",
+                "└── Full dynamic air-gapped container detonation designated for Cloud Detonation Host."
+            ],
+            droppedPayloads: []
+        },
+        yaraRule: `rule Linux_Botnet_Gafgyt_i686 {
+    meta:
+        description = "Detects x86 32-bit Linux botnet executable i686 (Gafgyt)"
+        sha256 = "4ba17752a7fa6fb2afb70124ea1e8651999487d1f4ece5196ab1c37beee75718"
+        author = "Hunter Security Labs"
+        date = "2026-09-14"
+        severity = "High"
+    strings:
+        $elf_hdr = { 7F 45 4C 46 01 01 01 }
+        $c2_ip = "2.27.248.149"
+        $dev_null = "/dev/null"
+    condition:
+        uint32(0) == 0x464c457f and $elf_hdr at 0 and ($c2_ip or $dev_null)
+}`
+    },
+    {
         id: "450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82",
         sha256: "450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82",
         title: "Linux ELF Dropper Staging Concealed XMRig Binary via Ephemeral Storage and Scheduled Persistence",
