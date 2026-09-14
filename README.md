@@ -1,6 +1,8 @@
-# Automated Threat Research Pipeline
+# Hunter - Autonomous Linux Threat Research & Detonation Intelligence
 
-An automated threat intelligence and dynamic malware detonation backend that ingests untrusted Linux binaries and scripts, executes them in ephemeral air-gapped Docker sandboxes, extracts DFIR triage telemetry using Velociraptor, synthesizes intelligence using Google AI Studio (Gemini), and generates defanged threat analysis reports.
+> **Live Research Portal**: [Hunter Security Labs](https://manumw.github.io/Hunter/) *(Inspired by Elastic Security Labs)*
+
+An automated threat intelligence and dynamic malware detonation platform that ingests untrusted Linux binaries and scripts via MalwareBazaar, executes them in ephemeral air-gapped Docker sandboxes, extracts DFIR triage telemetry using standalone Velociraptor, decomposes dropped payloads, synthesizes intelligence using Google AI Studio (Gemini 3.6-Flash), and publishes defanged threat research bulletins.
 
 ---
 
