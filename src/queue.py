@@ -85,12 +85,13 @@ class DetonationWorker:
             try:
                 logger.info(f"[*] Processing task {task.task_id} (SHA256: {task.sha256})")
                 
-                # Phase 1: Detonation in Docker
+                # Phase 1: Detonation in Docker (or Static Decomposition fallback)
                 task.status = "detonating"
                 detonation_result = await asyncio.to_thread(
                     run_detonation,
                     sample_path=task.sample_meta["quarantine_path"],
-                    sha256=task.sha256
+                    sha256=task.sha256,
+                    raw_bytes=task.sample_meta.get("raw_bytes")
                 )
                 
                 # Phase 2: Triage Extraction
@@ -118,7 +119,10 @@ class DetonationWorker:
                     synthesis=synthesis
                 )
                 task.report_markdown = report_md
-                task.report_path = f"reports/{task.sha256}.md"
+                from src.config import REPORTS_DIR
+                report_path = REPORTS_DIR / f"{task.sha256}.md"
+                report_path.write_text(report_md, encoding="utf-8")
+                task.report_path = str(report_path)
                 
                 task.status = "completed"
                 task.completed_at = datetime.now(timezone.utc).isoformat()

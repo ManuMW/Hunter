@@ -8,6 +8,14 @@
 
 let currentCategory = "ALL";
 let isAnalyzing = false;
+let activePollingInterval = null;
+
+// Configurable Detonation Host API URL (local dev or cloud VM via tunnel)
+const API_BASE_URL = window.HUNTER_API_URL || (
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+        ? "http://localhost:8000"
+        : ""
+);
 
 document.addEventListener("DOMContentLoaded", () => {
     initFilters();
@@ -154,21 +162,189 @@ async function handleHashSubmit() {
         return;
     }
 
-    // Honest queue notification modal for Cloud Detonation Host
-    showCloudQueueModal(hash);
+    // Check if Detonation Host API endpoint is configured
+    if (!API_BASE_URL) {
+        showCloudQueueModal(hash, false);
+        return;
+    }
+
+    // Submit live to Detonation Host API with dynamic real-time polling
+    await submitToDetonationApi(hash);
 }
 
-function showCloudQueueModal(hash) {
+async function submitToDetonationApi(hash) {
+    isAnalyzing = true;
+    const btnAnalyze = document.getElementById("btnAnalyze");
+    if (btnAnalyze) {
+        btnAnalyze.disabled = true;
+        btnAnalyze.textContent = "Connecting...";
+    }
+
+    showDynamicProgressModal(hash);
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/submit-hash`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ sha256: hash })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || `Server returned HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // If report was already cached on server
+        if (data.status === "cached" && data.report_url) {
+            await fetchAndDisplayReport(hash);
+            return;
+        }
+
+        if (data.task_id) {
+            updateStepState("step-1", "done");
+            updateStepState("step-2", "active");
+            startTaskPolling(data.task_id, hash);
+        } else {
+            throw new Error(data.message || "Invalid response from Detonation API");
+        }
+
+    } catch (err) {
+        console.warn("Detonation API unreachable or error:", err);
+        closeStatusModal();
+        showCloudQueueModal(hash, true, err.message);
+    } finally {
+        if (btnAnalyze) {
+            btnAnalyze.disabled = false;
+            btnAnalyze.textContent = "Analyze Hash";
+        }
+        isAnalyzing = false;
+    }
+}
+
+function startTaskPolling(taskId, hash) {
+    if (activePollingInterval) {
+        clearInterval(activePollingInterval);
+    }
+
+    const poll = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`);
+            if (!res.ok) return;
+
+            const task = await res.json();
+            handleTaskStateUpdate(task, hash);
+
+            if (task.status === "completed" || task.status === "failed") {
+                clearInterval(activePollingInterval);
+                activePollingInterval = null;
+            }
+        } catch (e) {
+            console.error("Task polling error:", e);
+        }
+    };
+
+    activePollingInterval = setInterval(poll, 2000);
+    poll(); // Run initial poll immediately
+}
+
+function handleTaskStateUpdate(task, hash) {
+    const statusText = document.getElementById("statusHashDisplay");
+    if (statusText) {
+        statusText.textContent = `Task ID: ${task.task_id.substring(0, 8)}... | Status: ${task.status.toUpperCase()}`;
+    }
+
+    if (task.status === "queued") {
+        updateStepState("step-1", "active");
+    } else if (task.status === "detonating") {
+        updateStepState("step-1", "done");
+        updateStepState("step-2", "active");
+    } else if (task.status === "extracting_artifacts") {
+        updateStepState("step-1", "done");
+        updateStepState("step-2", "done");
+        updateStepState("step-3", "active");
+    } else if (task.status === "analyzing" || task.status === "generating_report") {
+        updateStepState("step-1", "done");
+        updateStepState("step-2", "done");
+        updateStepState("step-3", "done");
+        updateStepState("step-4", "active");
+    } else if (task.status === "completed") {
+        updateStepState("step-1", "done");
+        updateStepState("step-2", "done");
+        updateStepState("step-3", "done");
+        updateStepState("step-4", "done");
+
+        setTimeout(async () => {
+            closeStatusModal();
+            await fetchAndDisplayReport(hash);
+            showToast("Detonation and analysis complete!");
+        }, 800);
+    } else if (task.status === "failed") {
+        clearInterval(activePollingInterval);
+        activePollingInterval = null;
+        alert(`Analysis failed on Detonation Host: ${task.error || "Unknown error"}`);
+        closeStatusModal();
+    }
+}
+
+function updateStepState(stepId, state) {
+    const el = document.getElementById(stepId);
+    if (!el) return;
+    el.className = `status-step ${state}`;
+}
+
+async function fetchAndDisplayReport(hash) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/reports/${hash}?format=json`);
+        if (res.ok) {
+            const reportData = await res.json();
+            if (reportData && !THREAT_REPORTS.some(r => r.sha256 === hash)) {
+                THREAT_REPORTS.unshift(reportData);
+                renderReports();
+            }
+            openReportModal(hash);
+            return;
+        }
+    } catch (e) {
+        console.error("Failed to fetch generated report JSON:", e);
+    }
+    openReportModal(hash);
+}
+
+function showDynamicProgressModal(hash) {
+    const statusModal = document.getElementById("statusModalBackdrop");
+    const hashDisplay = document.getElementById("statusHashDisplay");
+    if (hashDisplay) {
+        hashDisplay.textContent = `Connecting to Detonation Host for ${hash.substring(0, 16)}...`;
+    }
+
+    const stepIds = ["step-1", "step-2", "step-3", "step-4"];
+    stepIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = "status-step";
+    });
+    updateStepState("step-1", "active");
+
+    if (statusModal) {
+        statusModal.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+}
+
+function showCloudQueueModal(hash, isOfflineError = false, errorMsg = "") {
     const modalBackdrop = document.getElementById("reportModalBackdrop");
     const modalBadge = document.getElementById("modalBadge");
     const modalContent = document.getElementById("modalContent");
 
     if (modalBadge) {
-        modalBadge.textContent = "INGESTION QUEUE";
+        modalBadge.textContent = isOfflineError ? "DETONATION HOST OFFLINE" : "INGESTION QUEUE";
     }
 
     modalContent.innerHTML = `
-        <h1 class="report-headline">Sample Queued for Cloud Sandbox Detonation</h1>
+        <h1 class="report-headline">${isOfflineError ? "Cloud Detonation Host Unreachable" : "Sample Queued for Cloud Sandbox Detonation"}</h1>
         
         <div class="report-meta-grid">
             <div>
@@ -177,31 +353,37 @@ function showCloudQueueModal(hash) {
             </div>
             <div>
                 <span class="meta-field-label">QUEUE STATUS</span>
-                <span class="meta-field-value" style="color: var(--elastic-teal); font-weight: 700;">ENQUEUED</span>
+                <span class="meta-field-value" style="color: ${isOfflineError ? '#dc2626' : 'var(--elastic-teal)'}; font-weight: 700;">${isOfflineError ? "API OFFLINE" : "STANDBY"}</span>
             </div>
             <div>
                 <span class="meta-field-label">DETONATION TARGET</span>
-                <span class="meta-field-value">Cloud Host VM</span>
+                <span class="meta-field-value">GCP Compute Host</span>
             </div>
         </div>
 
-        <h3 class="report-h3">Automated Pipeline Lifecycle</h3>
+        <h3 class="report-h3">${isOfflineError ? "Connection Diagnosis" : "Automated Pipeline Lifecycle"}</h3>
         <p class="report-para">
-            This SHA-256 hash has been validated and registered. The automated Cloud Detonation Host worker executes:
+            ${isOfflineError 
+                ? `The web portal cannot reach an active Detonation Host API (<code>${escapeHtml(API_BASE_URL || "None")}</code>). To detonate uncataloged samples dynamically:`
+                : `This SHA-256 hash has been validated. Dynamic 90-second air-gapped sandbox detonation runs exclusively in the cloud (GCP Detonation Host):`
+            }
         </p>
+        
         <ol style="margin-left: 20px; font-size: 14px; line-height: 1.8; color: var(--text-body); margin-bottom: 20px;">
-            <li>Acquisition and decryption of the Linux sample binary from the MalwareBazaar repository.</li>
-            <li>Spin-up of an ephemeral air-gapped Docker sandbox (90-second execution window).</li>
-            <li>Forensic artifact triage (process tree, dropped payloads, persistence mechanisms) via Velociraptor.</li>
-            <li>Synthesis of verified MITRE ATT&amp;CK mapping and IoC tables published directly to this hub.</li>
+            ${isOfflineError ? `
+                <li><strong>Local Development API</strong>: Start the backend server via <code>python -m src.cli serve</code> (listens on <code>http://localhost:8000</code>).</li>
+                <li><strong>GCP Cloud Detonation Host</strong>: Run <code>deploy/provision_gcp_detonation_host.sh</code> on your Compute Engine VM and point Cloudflare Tunnel to this site.</li>
+                <li><strong>Cataloged Reports</strong>: In the meantime, you can explore the verified threat reports published below.</li>
+            ` : `
+                <li>Acquires and decrypts the sample binary from the MalwareBazaar repository.</li>
+                <li>Spins up an ephemeral air-gapped Docker sandbox (90-second execution window).</li>
+                <li>Extracts forensic artifacts (process trees, dropped payloads, persistence mechanisms) via Velociraptor.</li>
+                <li>Synthesizes verified MITRE ATT&amp;CK mappings and publishes the final report.</li>
+            `}
         </ol>
 
-        <p class="report-para" style="color: var(--text-muted); font-size: 13px;">
-            Published reports are cataloged as soon as cloud execution and triage synthesis complete.
-        </p>
-
-        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
-            <button class="btn-submit" onclick="closeReportModal()">Acknowledge</button>
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn-submit" onclick="closeReportModal()">Got it</button>
         </div>
     `;
 
@@ -350,6 +532,10 @@ function closeReportModal(e) {
 
 function closeStatusModal(e) {
     if (e && e.target !== e.currentTarget) return;
+    if (activePollingInterval) {
+        clearInterval(activePollingInterval);
+        activePollingInterval = null;
+    }
     const statusModal = document.getElementById("statusModalBackdrop");
     if (statusModal) {
         statusModal.classList.remove("active");
