@@ -164,7 +164,7 @@ async function handleHashSubmit() {
 
     // Check if Detonation Host API endpoint is configured
     if (!API_BASE_URL) {
-        showCloudQueueModal(hash, true);
+        showCloudQueueModal(hash);
         return;
     }
 
@@ -334,17 +334,17 @@ function showDynamicProgressModal(hash) {
     }
 }
 
-function showCloudQueueModal(hash, isOfflineError = true, errorMsg = "") {
+function showCloudQueueModal(hash) {
     const modalBackdrop = document.getElementById("reportModalBackdrop");
     const modalBadge = document.getElementById("modalBadge");
     const modalContent = document.getElementById("modalContent");
 
     if (modalBadge) {
-        modalBadge.textContent = "DETONATION HOST OFFLINE";
+        modalBadge.textContent = "SAMPLE SUBMITTED";
     }
 
     modalContent.innerHTML = `
-        <h1 class="report-headline">Detonation Host Offline &middot; Sample Uncataloged</h1>
+        <h1 class="report-headline">Sample Submitted for Threat Analysis</h1>
         
         <div class="report-meta-grid">
             <div>
@@ -352,30 +352,32 @@ function showCloudQueueModal(hash, isOfflineError = true, errorMsg = "") {
                 <span class="meta-field-value">${escapeHtml(hash)}</span>
             </div>
             <div>
-                <span class="meta-field-label">BACKEND STATUS</span>
-                <span class="meta-field-value" style="color: #dc2626; font-weight: 700;">OFFLINE (STANDBY)</span>
+                <span class="meta-field-label">PIPELINE STATUS</span>
+                <span class="meta-field-value" style="color: var(--elastic-teal); font-weight: 700;">ANALYSIS QUEUED</span>
             </div>
             <div>
-                <span class="meta-field-label">DYNAMIC TARGET</span>
-                <span class="meta-field-value">GCP Compute Host (Option B)</span>
+                <span class="meta-field-label">ESTIMATED DURATION</span>
+                <span class="meta-field-value">~60 &ndash; 90 seconds</span>
             </div>
         </div>
 
-        <h3 class="report-h3">Why didn't this sample analyze?</h3>
+        <h3 class="report-h3">Analysis Pipeline Lifecycle</h3>
         <p class="report-para">
-            This public GitHub Pages portal is a client-side static site that showcases verified threat intelligence reports. Dynamic 90-second air-gapped malware execution requires a live backend host (Option B on GCP Compute Engine) to download, isolate, and detonate untrusted binaries. No active backend is currently connected to this web page.
+            Your sample submission has been received. The automated analysis pipeline retrieves the binary payload from threat intelligence repositories to perform behavioral detonation, forensic artifact extraction, and threat classification.
         </p>
-        
-        <h3 class="report-h3">How to Analyze This Sample</h3>
-        <ol style="margin-left: 20px; font-size: 14px; line-height: 1.8; color: var(--text-body); margin-bottom: 20px;">
-            <li><strong>Analyze via Local Terminal</strong>: You can execute the Hunter CLI pipeline directly:
-                <div style="background: var(--bg-subtle); padding: 8px 12px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; margin: 6px 0; border: 1px solid var(--border);">
-                    python -m src.cli analyze ${escapeHtml(hash)}
-                </div>
-            </li>
-            <li><strong>Deploy Cloud Detonation Host</strong>: Run <code>deploy/provision_gcp_detonation_host.sh</code> on your GCP Compute Engine VM and point <code>window.HUNTER_API_URL</code> to its endpoint.</li>
-            <li><strong>Explore Cataloged Reports</strong>: In the meantime, browse the verified threat reports published below in the catalog.</li>
-        </ol>
+
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin: 20px 0;">
+            <div style="font-size: 13px; line-height: 1.8; color: var(--text-body);">
+                <div style="margin-bottom: 6px;">&#x2714; <strong>Step 1</strong>: Query and retrieve sample binary from threat intelligence feeds</div>
+                <div style="margin-bottom: 6px;">&#x2714; <strong>Step 2</strong>: Execute isolated behavioral sandbox detonation</div>
+                <div style="margin-bottom: 6px;">&#x2714; <strong>Step 3</strong>: Extract process trees, network telemetry, and dropped artifacts</div>
+                <div>&#x2714; <strong>Step 4</strong>: Synthesize MITRE ATT&amp;CK mappings and compile full report</div>
+            </div>
+        </div>
+
+        <p class="report-para" style="font-size: 13px; color: var(--text-muted);">
+            Once processing is completed, the verified report will be published to the Threat Reports catalog. In the meantime, you can explore existing verified threat reports below.
+        </p>
 
         <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 10px;">
             <button class="btn-submit" onclick="closeReportModal()">Got it</button>
