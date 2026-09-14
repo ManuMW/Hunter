@@ -64,3 +64,38 @@ def test_list_reports():
     response = client.get("/api/reports")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_submit_hash_alias(tmp_path, monkeypatch):
+    """Verifies that /api/submit-hash works identically to /api/submissions."""
+    monkeypatch.setattr("src.api.REPORTS_DIR", tmp_path)
+    sha256 = "ae4cb49ce4fa6aeb8f38ca703bc661cde36fbcadc05e3862ba3d8f7737ce7dcc"
+    fake_report = tmp_path / f"{sha256}.md"
+    fake_report.write_text("# Test Report", encoding="utf-8")
+
+    response = client.post(
+        "/api/submit-hash",
+        json={"sha256": sha256}
+    )
+    assert response.status_code == 202
+    assert response.json()["status"] == "cached"
+
+
+def test_get_threat_report_json(tmp_path, monkeypatch):
+    """Verifies that /api/reports/{sha256}?format=json returns structured report data."""
+    monkeypatch.setattr("src.api.REPORTS_DIR", tmp_path)
+    sha256 = "ae4cb49ce4fa6aeb8f38ca703bc661cde36fbcadc05e3862ba3d8f7737ce7dcc"
+    fake_report = tmp_path / f"{sha256}.md"
+    fake_report.write_text(
+        '---\ntitle: Threat Analysis Report - test.elf\nmalware_family: "Mirai"\nclassification: "Botnet"\nseverity_score: 8\n---\n\n# Threat Analysis Report\n',
+        encoding="utf-8"
+    )
+
+    response = client.get(f"/api/reports/{sha256}?format=json")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["sha256"] == sha256
+    assert data["family"] == "Mirai"
+    assert data["category"] == "BOTNET"
+    assert data["severity"] == "CRITICAL"
+

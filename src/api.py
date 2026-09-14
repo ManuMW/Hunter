@@ -1,17 +1,20 @@
 import logging
+import re
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, status, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.responses import PlainTextResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.config import REPORTS_DIR, CLIENT_DAILY_QUOTA
 from src.quarantine import quarantine_sample
 from src.runner import is_docker_available
-from src.queue import worker
+from src.queue import worker, synthesis_to_report_dict
 from src.malwarebazaar import (
     get_sample_info,
     download_sample_binary,
@@ -102,6 +105,7 @@ def health_check():
 
 
 @app.post("/api/submissions", response_model=HashSubmissionResponse, status_code=status.HTTP_202_ACCEPTED, tags=["Submissions"])
+@app.post("/api/submit-hash", response_model=HashSubmissionResponse, status_code=status.HTTP_202_ACCEPTED, tags=["Submissions"])
 async def submit_hash(
     sub_req: HashSubmissionRequest,
     request: Request,
@@ -224,7 +228,7 @@ def get_threat_report(sha256: str, format: str = "markdown"):
     """
     Retrieves the generated Threat Analysis Report for a sample.
     - format=markdown: Returns the raw Markdown report.
-    - format=json: Returns structured JSON synthesis data.
+    - format=json: Returns structured JSON report data for web catalog rendering.
     """
     sha256 = sha256.strip().lower()
     report_file = REPORTS_DIR / f"{sha256}.md"
@@ -239,8 +243,41 @@ def get_threat_report(sha256: str, format: str = "markdown"):
 
     if format == "json":
         task = worker.get_task_by_sha256(sha256)
+        if task and task.report_data:
+            return task.report_data
         if task and task.synthesis:
-            return task.synthesis
+            return synthesis_to_report_dict(
+                sha256=sha256,
+                filename=task.sample_meta.get("filename", "sample"),
+                synthesis=task.synthesis
+            )
+        # Parse from markdown frontmatter when task is not in memory
+        content = report_file.read_text(encoding="utf-8")
+        title_match = re.search(r"title:\s*(.+)", content)
+        family_match = re.search(r'malware_family:\s*"([^"]+)"', content)
+        class_match = re.search(r'classification:\s*"([^"]+)"', content)
+        score_match = re.search(r"severity_score:\s*(\d+)", content)
+        score = int(score_match.group(1)) if score_match else 7
+        family = family_match.group(1) if family_match else "Generic"
+        classification = class_match.group(1) if class_match else "THREAT"
+        return {
+            "id": sha256,
+            "sha256": sha256,
+            "title": title_match.group(1) if title_match else f"Threat Analysis Report - {sha256[:12]}",
+            "family": family,
+            "category": classification.upper(),
+            "severity": "CRITICAL" if score >= 8 else "HIGH" if score >= 6 else "MEDIUM",
+            "severityScore": f"{score}/10",
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "author": "Hunter Research Team",
+            "readTime": "4 min read",
+            "summary": "Full threat intelligence report cataloged in repository.",
+            "tags": [classification.upper(), family.upper()],
+            "mitre": [],
+            "iocs": [{"type": "sha256", "value": sha256, "description": "Sample SHA-256"}],
+            "behavior": {"processTree": ["Analysis completed."], "droppedPayloads": []},
+            "yaraRule": ""
+        }
 
     content = report_file.read_text(encoding="utf-8")
     return PlainTextResponse(content=content, media_type="text/markdown")
@@ -259,3 +296,20 @@ def list_reports() -> List[Dict[str, Any]]:
             "size_bytes": p.stat().st_size
         })
     return reports
+
+
+# Static asset mounting for interactive local/VM hosting
+if Path("css").exists():
+    app.mount("/css", StaticFiles(directory="css"), name="css")
+if Path("js").exists():
+    app.mount("/js", StaticFiles(directory="js"), name="js")
+if Path("data").exists():
+    app.mount("/data", StaticFiles(directory="data"), name="data")
+
+
+@app.get("/", response_class=FileResponse, tags=["Web"])
+def serve_index():
+    index_path = Path("index.html")
+    if index_path.exists():
+        return FileResponse(index_path)
+    return PlainTextResponse("Hunter Security Labs Detonation API")

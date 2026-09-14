@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 from src.runner import run_detonation
@@ -10,6 +12,85 @@ from src.ai_synthesis import synthesize_threat_report
 from src.report_generator import generate_threat_report
 
 logger = logging.getLogger(__name__)
+
+
+def synthesis_to_report_dict(
+    sha256: str,
+    filename: str,
+    synthesis: Dict[str, Any],
+    triage_data: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    score = synthesis.get("threat_severity_score", 7)
+    classification = synthesis.get("threat_classification", "MALWARE").upper()
+    family = synthesis.get("malware_family", "Generic")
+    severity = "CRITICAL" if score >= 8 else "HIGH" if score >= 6 else "MEDIUM"
+
+    mitre_list = [
+        {"id": t.get("technique_id", ""), "name": t.get("technique_name", ""), "tactic": t.get("tactic", "")}
+        for t in synthesis.get("mitre_attack_techniques", [])
+    ]
+    ioc_list = [
+        {"type": i.get("type", "indicator"), "value": i.get("value", ""), "description": i.get("description", "")}
+        for i in synthesis.get("indicators_of_compromise", [])
+    ]
+    process_tree = []
+    dropped_payloads = []
+    if triage_data:
+        for p in triage_data.get("spawned_processes", []):
+            process_tree.append(f"PID {p.get('pid', '?')}: {p.get('command', '')}")
+        for d in triage_data.get("dropped_files", []):
+            dropped_payloads.append({
+                "path": d.get("path", ""),
+                "size": str(d.get("size", "")),
+                "magic": d.get("permissions", ""),
+                "strings": []
+            })
+    if not process_tree:
+        for b in synthesis.get("observed_behaviors", []):
+            process_tree.append(f"{b.get('category', 'Behavior')}: {b.get('evidence', '')}")
+
+    return {
+        "id": sha256,
+        "sha256": sha256,
+        "title": f"Threat Analysis Report: {filename} ({family})",
+        "family": family,
+        "category": classification,
+        "severity": severity,
+        "severityScore": f"{score}/10",
+        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": synthesis.get("executive_summary", ""),
+        "tags": [classification, family.upper(), f"SEVERITY_{score}"],
+        "mitre": mitre_list,
+        "iocs": ioc_list,
+        "behavior": {
+            "processTree": process_tree or ["Analysis completed."],
+            "droppedPayloads": dropped_payloads
+        },
+        "yaraRule": synthesis.get("yara_rule_candidate", "")
+    }
+
+
+def append_to_catalog(report_dict: Dict[str, Any]):
+    """Appends newly detonated report to data/reports.js and web/data/reports.js."""
+    for file_path in [Path("data/reports.js"), Path("web/data/reports.js")]:
+        if not file_path.exists():
+            continue
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            if report_dict["sha256"] in content:
+                continue
+            prefix = "const THREAT_REPORTS = [\n"
+            idx = content.find(prefix)
+            if idx != -1:
+                json_str = json.dumps(report_dict, indent=4)
+                indented = "\n".join("    " + line for line in json_str.splitlines()) + ",\n"
+                new_content = content[:idx + len(prefix)] + indented + content[idx + len(prefix):]
+                file_path.write_text(new_content, encoding="utf-8")
+                logger.info(f"[+] Appended report {report_dict['sha256']} to {file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to append report to {file_path}: {e}")
 
 
 class DetonationTask:
@@ -24,6 +105,7 @@ class DetonationTask:
         self.report_markdown: Optional[str] = None
         self.report_path: Optional[str] = None
         self.synthesis: Optional[Dict[str, Any]] = None
+        self.report_data: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -123,6 +205,16 @@ class DetonationWorker:
                 report_path = REPORTS_DIR / f"{task.sha256}.md"
                 report_path.write_text(report_md, encoding="utf-8")
                 task.report_path = str(report_path)
+                
+                # Format catalog report and append to web catalogs
+                report_dict = synthesis_to_report_dict(
+                    sha256=task.sha256,
+                    filename=task.sample_meta.get("filename", "sample"),
+                    synthesis=task.synthesis,
+                    triage_data=triage_data
+                )
+                task.report_data = report_dict
+                append_to_catalog(report_dict)
                 
                 task.status = "completed"
                 task.completed_at = datetime.now(timezone.utc).isoformat()
