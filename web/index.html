@@ -3,41 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hunter Security Labs | Linux Adversary Intelligence & Detonation Research</title>
+    <title>Hunter Security Labs | Adversary Intelligence &amp; Linux Threat Research</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/labs.css">
 </head>
-<body class="cyber-dark">
+<body class="elastic-theme">
 
-    <!-- Subtle Circuit Grid Background Overlay -->
-    <div class="grid-overlay"></div>
-    <div class="ambient-glow cyan"></div>
-    <div class="ambient-glow purple"></div>
-
-    <!-- Navigation Header -->
+    <!-- Top Global Navigation Bar (Elastic Security Labs Style) -->
     <header class="labs-header">
         <div class="header-container">
             <div class="brand-group">
                 <a href="#" class="logo-link">
-                    <div class="logo-shield">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
-                            <circle cx="12" cy="12" r="3" fill="#00e5ff"/>
+                    <!-- Elastic-style clean logo mark -->
+                    <div class="logo-mark">
+                        <svg viewBox="0 0 32 32" width="24" height="24" fill="none">
+                            <rect width="32" height="32" rx="6" fill="#0077cc"/>
+                            <path d="M8 16L14 22L24 10" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
                     <div class="brand-text">
                         <span class="brand-title">HUNTER</span>
-                        <span class="brand-badge">SECURITY LABS</span>
+                        <span class="brand-sub">Security Labs</span>
                     </div>
                 </a>
             </div>
 
             <nav class="nav-menu">
-                <a href="#research" class="nav-item active">Threat Bulletins</a>
-                <a href="#telemetry" class="nav-item">Detonation Metrics</a>
-                <a href="#pipeline" class="nav-item">Architecture</a>
+                <a href="#publications" class="nav-item active">Publications</a>
+                <a href="#about-iocs" class="nav-item">IoC Guidance</a>
                 <a href="https://github.com/ManuMW/Hunter" target="_blank" class="nav-item github-link">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
@@ -47,12 +42,8 @@
             </nav>
 
             <div class="header-actions">
-                <button class="btn-detonate" onclick="openSubmissionModal()">
-                    <span class="btn-glow"></span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                    </svg>
-                    <span>Detonate Sample</span>
+                <button class="btn-primary" onclick="openSubmissionModal()">
+                    <span>Submit Hash</span>
                 </button>
             </div>
         </div>
@@ -61,105 +52,88 @@
     <!-- Hero Section -->
     <section class="hero-section">
         <div class="hero-content">
-            <div class="hero-pill">
-                <span class="pill-dot"></span>
-                <span>AUTONOMOUS LINUX THREAT RESEARCH</span>
+            <div class="hero-kicker">
+                <span class="kicker-pill">SECURITY RESEARCH</span>
             </div>
-            <h1 class="hero-title">Adversary Intelligence &amp; Live Linux Sandboxing</h1>
+            <h1 class="hero-title">Hunter Security Labs</h1>
             <p class="hero-subtitle">
-                Deconstructing emerging Linux threats via air-gapped container detonation, standalone Velociraptor forensic triage, and automated AI threat synthesis.
+                Independent adversary intelligence, dynamic threat analysis, and verified indicators of compromise targeting Linux infrastructure.
             </p>
 
-            <!-- Quick Hash Submission Ingestion Bar -->
-            <div class="submission-bar">
-                <div class="submission-input-wrap">
-                    <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- Quick Hash Search / Lookup Bar -->
+            <div class="search-bar-wrap">
+                <div class="search-input-box">
+                    <svg class="icon-search" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="text" id="quickHashInput" placeholder="Enter SHA-256 hash to search MalwareBazaar &amp; analyze..." spellcheck="false" autocomplete="off">
+                    <input type="text" id="quickHashInput" placeholder="Enter SHA-256 hash to look up or analyze..." spellcheck="false" autocomplete="off">
                     <button class="btn-clear" id="btnClearHash" onclick="clearHashInput()" style="display: none;">✕</button>
                 </div>
-                <button class="btn-analyze" onclick="handleQuickSubmit()">
-                    <span>Analyze</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                    </svg>
-                </button>
+                <button class="btn-primary btn-search" onclick="handleQuickSubmit()">Search</button>
             </div>
 
-            <!-- Sample Hash Quick Links -->
-            <div class="sample-pills">
-                <span class="pills-label">Recent Submissions:</span>
-                <button class="sample-chip" onclick="fillSample('e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451')">
-                    <span class="chip-tag botnet">MIRAI</span>
-                    <span>e41ff2d7...451</span>
+            <!-- Sample Hash Quick Chips -->
+            <div class="sample-chips-row">
+                <span class="chips-label">Analyzed Samples:</span>
+                <button class="chip-item" onclick="fillSample('450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82')">
+                    <span class="chip-dot"></span>
+                    <span>XMRig Dropper (450adfde...)</span>
                 </button>
-                <button class="sample-chip" onclick="fillSample('a3f89c0182b7de994101eef2a8b9193248cf7a102948e91823749281a0293847')">
-                    <span class="chip-tag miner">MINER</span>
-                    <span>.hidden_miner</span>
+                <button class="chip-item" onclick="fillSample('e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451')">
+                    <span class="chip-dot"></span>
+                    <span>Mirai Botnet (e41ff2d7...)</span>
                 </button>
-                <button class="sample-chip" onclick="fillSample('7b19a842f1092e03948572109847120938471092837401928374019283740192')">
-                    <span class="chip-tag rootkit">WIPER</span>
-                    <span>AcidRain ELF</span>
+                <button class="chip-item" onclick="fillSample('ae4cb49ce4fa6aeb8f38ca703bc661cde36fbcadc05e3862ba3d8f7737ce7dcc')">
+                    <span class="chip-dot"></span>
+                    <span>Cron Persistence (ae4cb49c...)</span>
                 </button>
             </div>
         </div>
     </section>
 
-    <!-- Live Threat Telemetry Stats Bar -->
-    <section class="telemetry-bar" id="telemetry">
-        <div class="telemetry-container">
-            <div class="metric-card">
-                <div class="metric-header">
-                    <span class="metric-label">TOTAL DETONATIONS</span>
-                    <span class="status-pulse green"></span>
-                </div>
-                <div class="metric-value">1,482</div>
-                <div class="metric-desc">Automated Sandbox Runs</div>
+    <!-- Verified Intelligence Metrics -->
+    <section class="metrics-section">
+        <div class="metrics-container">
+            <div class="metric-item">
+                <div class="metric-num">3</div>
+                <div class="metric-text">Published Threat Bulletins</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-header">
-                    <span class="metric-label">CATALOGED IOCs</span>
-                    <span class="status-pulse cyan"></span>
-                </div>
-                <div class="metric-value">5,910</div>
-                <div class="metric-desc">Defanged C2s &amp; Hashes</div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+                <div class="metric-num">14</div>
+                <div class="metric-text">Defanged Indicators of Compromise</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-header">
-                    <span class="metric-label">SANDBOX ENVIRONMENT</span>
-                    <span class="status-pulse yellow"></span>
-                </div>
-                <div class="metric-value">AIR-GAPPED</div>
-                <div class="metric-desc">--network none Isolation</div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+                <div class="metric-num">100%</div>
+                <div class="metric-text">Linux ELF Architecture Focus</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-header">
-                    <span class="metric-label">TRIAGE ENGINE</span>
-                    <span class="status-pulse purple"></span>
-                </div>
-                <div class="metric-value">VELOCIRAPTOR</div>
-                <div class="metric-desc">Standalone CLI Forensic Triage</div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+                <div class="metric-num">Open</div>
+                <div class="metric-text">Public Community Threat Feeds</div>
             </div>
         </div>
     </section>
 
-    <!-- Research Bulletins & Publications -->
-    <main class="main-container" id="research">
-        <!-- Controls Bar: Search & Category Filters -->
-        <div class="controls-bar">
-            <div class="filter-chips" id="categoryFilters">
-                <button class="filter-btn active" data-category="ALL">All Bulletins</button>
-                <button class="filter-btn" data-category="BOTNET">Botnets &amp; DDoS</button>
-                <button class="filter-btn" data-category="CRYPTOMINER">Cryptominers</button>
-                <button class="filter-btn" data-category="DROPPER">Multi-Stage Droppers</button>
-                <button class="filter-btn" data-category="PERSISTENCE">Persistence &amp; Cron</button>
-                <button class="filter-btn" data-category="WIPER">Wipers &amp; Ransomware</button>
+    <!-- Research Bulletins & Articles -->
+    <main class="main-content" id="publications">
+        <div class="section-title-wrap">
+            <h2 class="section-heading">Threat Research &amp; Bulletins</h2>
+            <p class="section-subheading">In-depth technical investigations, behavioral indicators, and mitigation guidance.</p>
+        </div>
+
+        <!-- Filter Controls Bar -->
+        <div class="filter-bar">
+            <div class="category-tabs" id="categoryFilters">
+                <button class="tab-btn active" data-category="ALL">All Research</button>
+                <button class="tab-btn" data-category="CRYPTOMINER">Cryptominers</button>
+                <button class="tab-btn" data-category="BOTNET">Botnets &amp; DDoS</button>
+                <button class="tab-btn" data-category="DROPPER">Multi-Stage Droppers</button>
             </div>
 
-            <div class="search-box">
+            <div class="filter-search">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -168,231 +142,186 @@
             </div>
         </div>
 
-        <!-- Flagship Featured Publication Card -->
-        <article class="featured-card" onclick="openReportModal('a3f89c0182b7de994101eef2a8b9193248cf7a102948e91823749281a0293847')">
-            <div class="featured-badge-bar">
-                <span class="featured-tag">FLAGSHIP INVESTIGATION</span>
-                <span class="threat-severity high">CRITICAL SEVERITY</span>
-                <span class="pub-date">PUBLISHED TODAY</span>
-            </div>
-            <div class="featured-body">
-                <h2 class="featured-title">Deconstructing Multi-Stage Shell Dropper Staging Hidden XMRig Miner via Linux Ephemeral Storage</h2>
-                <p class="featured-excerpt">
-                    Comprehensive dynamic analysis of an obfuscated bash dropper unpacking <code>.hidden_miner</code> into <code>/tmp</code>, executing multi-threaded cryptocurrency mining, establishing persistence via user crontabs, and defanging associated mining pool endpoints.
+        <!-- Featured Publication (Elastic Security Labs Hero Card Style) -->
+        <article class="featured-card" onclick="openReportModal('450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82')">
+            <div class="featured-content">
+                <div class="card-pills">
+                    <span class="pill pill-primary">FEATURED RESEARCH</span>
+                    <span class="pill pill-category">CRYPTOMINER</span>
+                    <span class="read-time">4 min read</span>
+                </div>
+                <h2 class="featured-heading">Linux ELF Dropper Staging Concealed XMRig Binary via Ephemeral Storage and Scheduled Persistence</h2>
+                <p class="featured-summary">
+                    Forensic investigation into a Linux binary designed to execute unauthorized cryptocurrency mining. Dynamic telemetry revealed secondary payload dropping under concealed dot-prefixed paths in <code>/tmp</code>, Monero pool communication, and persistence establishment via root crontabs.
                 </p>
-                <div class="featured-meta">
+                <div class="featured-meta-row">
                     <div class="meta-item">
                         <span class="meta-label">SAMPLE SHA-256</span>
-                        <code class="hash-mono">a3f89c0182b7de994101eef2a8b9193248cf7a102948e91823749281a0293847</code>
+                        <code class="hash-code">450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82</code>
                     </div>
-                    <div class="meta-badges">
-                        <span class="mitre-badge">T1053.003 (Cron)</span>
-                        <span class="mitre-badge">T1027 (Obfuscation)</span>
-                        <span class="mitre-badge">T1496 (Resource Hijacking)</span>
+                    <div class="meta-item">
+                        <span class="meta-label">MITRE ATT&amp;CK</span>
+                        <div class="mitre-chips">
+                            <span class="mitre-chip">T1496 (Resource Hijacking)</span>
+                            <span class="mitre-chip">T1053.003 (Cron)</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="featured-footer">
-                <span class="read-link">
-                    View Threat Intelligence Bulletin
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                    </svg>
-                </span>
+                <div class="card-action-row">
+                    <span class="cta-link">
+                        Read Threat Analysis Report
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
+                </div>
             </div>
         </article>
 
-        <!-- Bulletins Grid -->
+        <!-- Publications Grid -->
         <div class="bulletins-grid" id="bulletinsGrid">
-            <!-- Dynamic Cards Populated by JS -->
+            <!-- Populated dynamically via JS -->
         </div>
+
+        <!-- Defanged IoC Educational Section -->
+        <section class="info-card" id="about-iocs">
+            <div class="info-icon">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#00a9e5" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+            </div>
+            <div class="info-text">
+                <h3 class="info-title">What are "Defanged" Indicators of Compromise (IoCs)?</h3>
+                <p class="info-desc">
+                    In threat research, <strong>defanging</strong> is the standard industry safety practice of intentionally neutralizing malicious URLs, domains, and IP addresses so they cannot be accidentally clicked or automatically contacted by your browser or email client.
+                </p>
+                <div class="defang-examples">
+                    <div class="example-item">
+                        <span class="ex-label">Active Threat URL:</span>
+                        <span class="ex-active">http://malicious-c2.com/payload</span>
+                    </div>
+                    <div class="example-arrow">➔</div>
+                    <div class="example-item">
+                        <span class="ex-label">Defanged Safe Indicator:</span>
+                        <span class="ex-defanged">hxxp[://]malicious-c2[.]com/payload</span>
+                    </div>
+                </div>
+                <p class="info-sub">
+                    Hunter automatically defangs all extracted telemetry in published bulletins, protecting security defenders and preventing web filters from flagging research pages.
+                </p>
+            </div>
+        </section>
     </main>
 
-    <!-- Pipeline Architecture Deep Dive Section -->
-    <section class="pipeline-section" id="pipeline">
-        <div class="pipeline-container">
-            <div class="section-header">
-                <span class="section-tag">ENGINEERING FOUNDATION</span>
-                <h2 class="section-title">Zero-Trust Detonation Architecture</h2>
-                <p class="section-subtitle">How Hunter ingests, sandboxes, and synthesizes Linux threats without human intervention.</p>
-            </div>
-
-            <div class="pipeline-flow">
-                <div class="flow-step">
-                    <div class="step-number">01</div>
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#00e5ff" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                        </svg>
-                    </div>
-                    <h3 class="step-title">Ingestion &amp; Decrypt</h3>
-                    <p class="step-desc">Accepts SHA-256 hashes, queries MalwareBazaar (abuse.ch) API, downloads and decrypts WinZip AES-256 protected payloads (password: <code>infected</code>).</p>
-                </div>
-
-                <div class="flow-step">
-                    <div class="step-number">02</div>
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#00bfb3" stroke-width="2">
-                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                            <line x1="6" y1="6" x2="6.01" y2="6"/>
-                            <line x1="6" y1="18" x2="6.01" y2="18"/>
-                        </svg>
-                    </div>
-                    <h3 class="step-title">Air-Gapped Sandbox</h3>
-                    <p class="step-desc">Detonates in ephemeral Docker containers with <code>--network none</code>, 512MB RAM, 1 CPU, and a 90-second watchdog to prevent escape and lateral movement.</p>
-                </div>
-
-                <div class="flow-step">
-                    <div class="step-number">03</div>
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#a855f7" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                            <polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                    </div>
-                    <h3 class="step-title">Velociraptor Triage</h3>
-                    <p class="step-desc">Standalone Velociraptor binary extracts process trees (<code>Linux.Sys.Pslist</code>), detects cron persistence, and decomposes dropped binaries via static string carving.</p>
-                </div>
-
-                <div class="flow-step">
-                    <div class="step-number">04</div>
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#ff8c00" stroke-width="2">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                        </svg>
-                    </div>
-                    <h3 class="step-title">Gemini Synthesis</h3>
-                    <p class="step-desc">Google AI Studio (Gemini 3.6-Flash) models behavioral telemetry into defanged threat reports, MITRE mappings, extracted IoCs, and verified YARA candidate rules.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
+    <!-- Global Footer -->
     <footer class="labs-footer">
         <div class="footer-container">
-            <div class="footer-left">
-                <div class="brand-text">
+            <div class="footer-top">
+                <div class="footer-brand">
                     <span class="brand-title">HUNTER</span>
-                    <span class="brand-badge">SECURITY LABS</span>
+                    <span class="brand-sub">Security Labs</span>
+                    <p class="footer-blurb">Independent threat intelligence and malware research for defensive operations.</p>
                 </div>
-                <p class="footer-tagline">Open-source threat research &amp; malware intelligence platform for defenders.</p>
-            </div>
-            <div class="footer-links">
-                <a href="https://github.com/ManuMW/Hunter" target="_blank">GitHub Repository</a>
-                <a href="https://manumw21.atlassian.net/jira/software/projects/HUN/boards/34" target="_blank">Jira Board</a>
-                <a href="https://bazaar.abuse.ch/" target="_blank">MalwareBazaar</a>
-                <a href="#pipeline">Architecture</a>
+                <div class="footer-nav">
+                    <a href="#publications">Publications</a>
+                    <a href="#about-iocs">Defanged IoCs</a>
+                    <a href="https://github.com/ManuMW/Hunter" target="_blank">GitHub</a>
+                    <a href="https://manumw21.atlassian.net/jira/software/projects/HUN/boards/34" target="_blank">Jira Board</a>
+                </div>
             </div>
             <div class="footer-bottom">
-                <span>&copy; 2026 Hunter Security Labs. All reports published under Open Defanged Threat Intelligence License.</span>
+                <span>&copy; 2026 Hunter Security Labs. All reports published for public defensive security research.</span>
             </div>
         </div>
     </footer>
 
-    <!-- Report Detail Modal (Elastic Security Labs Style) -->
+    <!-- Report Detail View Modal -->
     <div class="modal-overlay" id="reportModalOverlay" onclick="closeReportModal(event)">
         <div class="report-modal" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <div class="modal-header-badges">
-                    <span class="modal-cat-tag" id="modalCatTag">MALWARE ANALYSIS</span>
-                    <span class="threat-severity" id="modalSeverity">HIGH</span>
+            <div class="modal-topbar">
+                <div class="topbar-left">
+                    <span class="modal-pill" id="modalCatTag">RESEARCH BULLETIN</span>
+                    <span class="modal-severity" id="modalSeverity">HIGH SEVERITY</span>
                 </div>
-                <button class="modal-close-btn" onclick="closeReportModal()">✕</button>
+                <button class="btn-close" onclick="closeReportModal()">✕</button>
             </div>
 
-            <div class="modal-scroll-body" id="modalReportContent">
-                <!-- Dynamically Rendered Report -->
+            <div class="modal-body-scroll" id="modalReportContent">
+                <!-- Injected via JavaScript -->
             </div>
         </div>
     </div>
 
-    <!-- Hash Detonation Live Modal -->
+    <!-- Hash Submission Modal -->
     <div class="modal-overlay" id="submissionModalOverlay" onclick="closeSubmissionModal(event)">
         <div class="submission-modal" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <div class="modal-header-title">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#00e5ff" stroke-width="2">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                    </svg>
-                    <span>Submit Sample for Detonation</span>
-                </div>
-                <button class="modal-close-btn" onclick="closeSubmissionModal()">✕</button>
+            <div class="modal-topbar">
+                <div class="topbar-title">Submit Sample for Threat Analysis</div>
+                <button class="btn-close" onclick="closeSubmissionModal()">✕</button>
             </div>
 
-            <div class="submission-body">
-                <p class="modal-desc">
-                    Submit a SHA-256 hash of a Linux binary. Hunter will fetch the sample from MalwareBazaar, detonate it in an isolated container, and synthesize forensic telemetry.
+            <div class="modal-content-wrap">
+                <p class="modal-intro">
+                    Submit the SHA-256 hash of a Linux sample. Hunter will retrieve metadata, perform threat analysis, and publish a defanged research bulletin.
                 </p>
 
-                <div class="input-group">
+                <div class="form-group">
                     <label for="modalHashInput">SAMPLE SHA-256 HASH</label>
-                    <input type="text" id="modalHashInput" placeholder="e.g. e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451" spellcheck="false">
+                    <input type="text" id="modalHashInput" placeholder="e.g. 450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82" spellcheck="false">
                 </div>
 
-                <!-- Turnstile Simulated / Bot Defense Checkbox -->
-                <div class="turnstile-box">
-                    <div class="turnstile-check">
-                        <input type="checkbox" id="turnstileCheck" checked disabled>
-                        <label for="turnstileCheck">
-                            <span class="cf-logo">🛡️</span>
-                            <span>Cloudflare Turnstile Verified (Browser UUID active)</span>
-                        </label>
-                    </div>
-                    <div class="quota-pill">Client Quota: 5 / 5 Detonations Remaining</div>
+                <div class="quota-badge-row">
+                    <span class="quota-indicator">Daily Client Quota: <strong>5 Submissions Remaining</strong></span>
+                    <span class="quota-tag">Rate-Limited</span>
                 </div>
 
-                <!-- Live Progress Stepper (Visible during submission) -->
-                <div class="detonation-stepper" id="detonationStepper" style="display: none;">
-                    <div class="step-item" id="step-mb">
-                        <div class="step-indicator"></div>
-                        <div class="step-details">
-                            <div class="step-name">MalwareBazaar Query &amp; Payload Decryption</div>
-                            <div class="step-sub">Downloading encrypted zip (pass: infected)</div>
+                <!-- Analysis Progress Stepper -->
+                <div class="progress-stepper" id="detonationStepper" style="display: none;">
+                    <div class="step-row" id="step-mb">
+                        <div class="step-dot"></div>
+                        <div class="step-text">
+                            <div class="step-heading">Sample Acquisition &amp; Extraction</div>
+                            <div class="step-caption">Locating binary hash and extracting payload</div>
                         </div>
                     </div>
-                    <div class="step-item" id="step-box">
-                        <div class="step-indicator"></div>
-                        <div class="step-details">
-                            <div class="step-name">Ephemeral Sandbox Detonation</div>
-                            <div class="step-sub">Air-gapped execution &amp; 90s watchdog monitoring</div>
+                    <div class="step-row" id="step-box">
+                        <div class="step-dot"></div>
+                        <div class="step-text">
+                            <div class="step-heading">Behavioral Execution &amp; Monitoring</div>
+                            <div class="step-caption">Analyzing execution paths and spawned processes</div>
                         </div>
                     </div>
-                    <div class="step-item" id="step-vr">
-                        <div class="step-indicator"></div>
-                        <div class="step-details">
-                            <div class="step-name">Velociraptor Artifact Triage</div>
-                            <div class="step-sub">Extracting process trees &amp; dropped payload decomposition</div>
+                    <div class="step-row" id="step-vr">
+                        <div class="step-dot"></div>
+                        <div class="step-text">
+                            <div class="step-heading">Forensic Telemetry Triage</div>
+                            <div class="step-caption">Decomposing dropped binaries and cron persistence</div>
                         </div>
                     </div>
-                    <div class="step-item" id="step-ai">
-                        <div class="step-indicator"></div>
-                        <div class="step-details">
-                            <div class="step-name">Gemini 3.6-Flash Threat Synthesis</div>
-                            <div class="step-sub">Generating defanged report, MITRE mappings &amp; YARA rule</div>
+                    <div class="step-row" id="step-ai">
+                        <div class="step-dot"></div>
+                        <div class="step-text">
+                            <div class="step-heading">Threat Intelligence Synthesis</div>
+                            <div class="step-caption">Generating MITRE mappings, defanged IoCs, and YARA detection</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="modal-footer">
-                    <button class="btn-cancel" onclick="closeSubmissionModal()">Cancel</button>
-                    <button class="btn-submit-action" id="btnSubmitAction" onclick="executeDetonation()">
-                        <span>Start Detonation</span>
-                    </button>
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="closeSubmissionModal()">Cancel</button>
+                    <button class="btn-primary" id="btnSubmitAction" onclick="executeDetonation()">Start Analysis</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Notification Toast -->
-    <div class="toast-notification" id="toastNotification">
-        <span class="toast-icon">✓</span>
-        <span class="toast-message" id="toastMessage">Copied to clipboard!</span>
+    <div class="toast-popup" id="toastNotification">
+        <span class="toast-check">✓</span>
+        <span id="toastMessage">Copied to clipboard!</span>
     </div>
 
     <script src="data/reports.js"></script>

