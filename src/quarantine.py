@@ -59,5 +59,6 @@ def quarantine_sample(content: bytes, original_filename: str) -> Dict[str, Any]:
         "filename": original_filename,
         "size_bytes": size_bytes,
         "file_type": file_type,
-        "quarantine_path": str(target_path)
+        "quarantine_path": str(target_path),
+        "raw_bytes": content
     }

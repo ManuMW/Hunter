@@ -170,15 +170,16 @@ Dropped Payloads & Secondary Stages (Static Decomposition & Strings):
 Persistence Hooks (Cron / Systemd):
 {json.dumps(triage_data.get('persistence_hooks', []), indent=2)}
 
-Network Indicators:
-{json.dumps(triage_data.get('network_indicators', []), indent=2)}
+Static Decomposition Findings (ELF Headers, Extracted Strings, Embedded Keywords):
+{json.dumps(triage_data.get('static_indicators', {}), indent=2)}
 
 Instructions:
-1. Synthesize these findings into a rigorous Threat Intelligence analysis.
-2. Map all concrete forensic observations to official MITRE ATT&CK techniques with exact technique IDs.
-3. Extract all Indicators of Compromise (IoCs) including file hashes, dropped paths, and configuration artifacts.
-4. Generate a syntactically valid YARA rule tailored to detect this sample's characteristics.
-5. Adhere strictly to the requested JSON schema.
+1. Synthesize these findings into a rigorous, truthful Threat Intelligence analysis tailored exclusively to THIS specific sample.
+2. If dynamic container execution was not performed (static triage mode), base your analysis on the sample's genuine static decomposition, ELF structure, extracted strings, and network targets. DO NOT invent unobserved child processes, fake Monero wallets, or fake file paths.
+3. Map concrete forensic observations to official MITRE ATT&CK techniques with exact technique IDs.
+4. Extract all genuine Indicators of Compromise (IoCs) including file hashes, discovered IP addresses, URLs, and paths from the artifacts.
+5. Generate a syntactically valid YARA rule tailored specifically to detect this sample's unique strings or header properties.
+6. Adhere strictly to the requested JSON schema.
 """
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={key}"
@@ -220,20 +221,84 @@ def _deterministic_fallback_synthesis(
     processes = triage_data.get("spawned_processes", [])
     dropped = triage_data.get("dropped_files", [])
     persistence = triage_data.get("persistence_hooks", [])
-    
-    # Heuristics
-    is_miner = any("miner" in str(p).lower() or "pool" in str(p).lower() for p in processes + dropped)
-    has_cron = len(persistence) > 0
-    severity = 5
-    if is_miner:
-        severity += 2
+    static_data = triage_data.get("static_indicators", {})
+    indicators = static_data.get("indicators", {})
+    keywords = indicators.get("keywords", {})
+    ips = indicators.get("ips", [])
+    urls = indicators.get("urls", [])
+    paths = indicators.get("paths", [])
+    sample_strings = indicators.get("sample_strings", [])
+
+    is_scanner_botnet = (
+        keywords.get("ssh", 0) > 10 or 
+        keywords.get("telnet", 0) > 5 or 
+        keywords.get("scan", 0) > 10 or 
+        keywords.get("flood", 0) > 0 or
+        keywords.get("mirai", 0) > 0
+    )
+    is_miner = (
+        keywords.get("miner", 0) > 0 or 
+        keywords.get("wallet", 0) > 0 or 
+        keywords.get("stratum", 0) > 0 or 
+        any("miner" in str(p).lower() for p in processes + dropped)
+    )
+    is_dropper = (
+        keywords.get("dropper", 0) > 0 or 
+        keywords.get("wget", 0) > 0 or 
+        keywords.get("curl", 0) > 0
+    )
+
+    has_cron = len(persistence) > 0 or any("cron" in str(p) for p in paths)
+
+    severity = 6
+    if is_scanner_botnet:
+        classification = "Botnet"
+        family = "Linux Network Scanner / Botnet"
+        severity = 8
+    elif is_miner:
+        classification = "Cryptominer"
+        family = "Linux Cryptominer"
+        severity = 7
+    elif is_dropper:
+        classification = "Dropper"
+        family = "Linux Downloader / Dropper"
+        severity = 7
+    else:
+        classification = "Trojan"
+        family = "Linux Suspicious Executable"
+        severity = 6
+
     if has_cron:
-        severity += 2
-        
-    family = "Suspicious Linux Cryptominer" if is_miner else "Generic Linux Suspicious Executable"
-    classification = "Cryptominer" if is_miner else "Trojan"
-    
+        severity = min(10, severity + 1)
+
     mitre = []
+    if is_scanner_botnet:
+        mitre.append(MitreTechnique(
+            technique_id="T1046",
+            technique_name="Network Service Discovery",
+            tactic="Discovery",
+            evidence=f"Discovered embedded network scanning strings and brute-force routines ({keywords.get('scan', 0)} scan markers, {keywords.get('ssh', 0)} SSH references)"
+        ))
+        mitre.append(MitreTechnique(
+            technique_id="T1110",
+            technique_name="Brute Force",
+            tactic="Credential Access",
+            evidence="Detected automated credential spraying keywords and target service bindings"
+        ))
+    if is_miner:
+        mitre.append(MitreTechnique(
+            technique_id="T1496",
+            technique_name="Resource Hijacking",
+            tactic="Impact",
+            evidence="Cryptocurrency mining configuration or stratum pool endpoints detected"
+        ))
+    if has_cron:
+        mitre.append(MitreTechnique(
+            technique_id="T1053.003",
+            technique_name="Scheduled Task/Job: Cron",
+            tactic="Persistence",
+            evidence="Cron persistence references detected in binary or filesystem hooks"
+        ))
     if processes:
         mitre.append(MitreTechnique(
             technique_id="T1059.004",
@@ -241,44 +306,48 @@ def _deterministic_fallback_synthesis(
             tactic="Execution",
             evidence=f"Spawned {len(processes)} process(es)"
         ))
-    if has_cron:
-        mitre.append(MitreTechnique(
-            technique_id="T1053.003",
-            technique_name="Scheduled Task/Job: Cron",
-            tactic="Persistence",
-            evidence=f"Detected cron persistence entries: {', '.join(persistence[:2])}"
-        ))
-    if dropped:
-        mitre.append(MitreTechnique(
-            technique_id="T1105",
-            technique_name="Ingress Tool Transfer",
-            tactic="Command and Control",
-            evidence=f"Dropped files in temporary staging: {', '.join(str(d.get('path')) for d in dropped[:3])}"
-        ))
-        
-    behaviors = [
-        ObservedBehavior(
-            category="Execution",
-            description="Sample executed in air-gapped sandbox environment.",
-            evidence=f"Sample type: {sample_meta.get('file_type')}"
-        )
-    ]
-    if persistence:
+
+    behaviors = []
+    if is_scanner_botnet:
         behaviors.append(ObservedBehavior(
-            category="Persistence",
-            description="Installed persistence mechanism on local filesystem.",
-            evidence=str(persistence[0])
+            category="Discovery",
+            description="Embedded network port discovery and authentication routines.",
+            evidence=f"Identified {keywords.get('ssh', 0)} SSH references and {keywords.get('scan', 0)} scan routines."
+        ))
+    if ips:
+        behaviors.append(ObservedBehavior(
+            category="Command and Control",
+            description="Hardcoded external IPv4 addresses embedded in executable data sections.",
+            evidence=f"Discovered IP endpoints: {', '.join(ips[:4])}"
+        ))
+    if not behaviors:
+        behaviors.append(ObservedBehavior(
+            category="Execution",
+            description="Static binary analysis and telemetry decomposition.",
+            evidence=f"Sample type: {sample_meta.get('file_type')}"
         ))
 
     iocs = [
-        IndicatorOfCompromise(type="sha256", value=sample_meta.get("sha256", ""), description="Sample SHA-256"),
-        IndicatorOfCompromise(type="md5", value=sample_meta.get("md5", ""), description="Sample MD5")
+        IndicatorOfCompromise(type="sha256", value=sample_meta.get("sha256", ""), description="Primary sample SHA-256"),
+        IndicatorOfCompromise(type="md5", value=sample_meta.get("md5", ""), description="Primary sample MD5")
     ]
-    for d in dropped:
-        if d.get("path"):
-            iocs.append(IndicatorOfCompromise(type="file_path", value=d["path"], description="Dropped artifact path"))
+    for ip in ips[:8]:
+        iocs.append(IndicatorOfCompromise(type="ip", value=ip, description="Discovered external IP endpoint"))
+    for url in urls[:5]:
+        iocs.append(IndicatorOfCompromise(type="url", value=url, description="Discovered URL indicator"))
+    for p in paths[:5]:
+        iocs.append(IndicatorOfCompromise(type="file_path", value=p, description="Discovered filesystem path"))
 
     safe_name = sample_meta.get("filename", "sample").replace(".", "_").replace("-", "_")
+
+    yara_strings = []
+    for idx, s in enumerate(sample_strings[:4], 1):
+        clean_s = re.sub(r'[^a-zA-Z0-9_\-\./:]', '', s)
+        if len(clean_s) >= 4:
+            yara_strings.append(f'        $s{idx} = "{clean_s}" ascii')
+    if not yara_strings:
+        yara_strings.append('        $magic = { 7F 45 4C 46 }')
+
     yara = f"""rule Linux_{safe_name} {{
     meta:
         description = "Automated detection rule for {sample_meta.get('sha256')}"
@@ -286,33 +355,19 @@ def _deterministic_fallback_synthesis(
         date = "2026-09-13"
         hash = "{sample_meta.get('sha256')}"
     strings:
-        $magic = {{ 7F 45 4C 46 }}
+{chr(10).join(yara_strings)}
     condition:
-        $magic at 0 and filesize < {max(sample_meta.get('size_bytes', 1000) * 2, 2048)}
+        uint32(0) == 0x464c457f and any of them
 }}"""
 
     summary = (
-        f"Dynamic analysis was conducted on sample '{sample_meta.get('filename')}' "
-        f"({sample_meta.get('file_type')}). During the 90-second air-gapped detonation run, "
-        f"the sample initiated {len(processes)} process execution(s) and staged {len(dropped)} "
-        f"artifact(s) into temporary filesystem directories. "
-        + ("A persistence mechanism was identified via cron modifications. " if has_cron else "")
-        + "Indicators have been extracted and mapped to corresponding MITRE ATT&CK techniques."
+        f"Static binary analysis and reverse engineering triage was conducted on sample '{sample_meta.get('filename')}' "
+        f"({sample_meta.get('file_type')}, {sample_meta.get('size_bytes')} bytes). "
+        f"The sample was categorized as a {family} ({classification}). "
+        + (f"Static string extraction revealed {len(ips)} external IP targets and {len(urls)} URLs. " if ips or urls else "")
+        + (f"Key operational indicators include {keywords.get('ssh', 0)} SSH markers and {keywords.get('scan', 0)} scanning routines. " if is_scanner_botnet else "")
+        + "Full dynamic container execution is designated for the Cloud Detonation Host."
     )
-
-    payload_analyses = []
-    for dp in triage_data.get("dropped_payloads", []):
-        is_sub_miner = "miner" in dp["filename"].lower() or any("miner" in s.lower() for s in dp.get("extracted_strings", []))
-        role = "Mining Worker / Secondary Stage" if is_sub_miner else "Auxiliary Script / Stager"
-        payload_analyses.append(DroppedPayloadAnalysis(
-            filename=dp["filename"],
-            sha256=dp["sha256"],
-            file_type=dp["file_type"],
-            role=role,
-            analysis=f"Extracted dropped payload staged at {dp.get('target_path')}. " +
-                     ("Configured with external pool parameters." if dp.get("parsed_config") else "Static analysis revealed embedded indicators."),
-            embedded_indicators=dp.get("extracted_strings", [])[:5]
-        ))
 
     return ThreatAnalysisSynthesis(
         malware_family=family,
@@ -322,7 +377,7 @@ def _deterministic_fallback_synthesis(
         mitre_attack_techniques=mitre,
         observed_behaviors=behaviors,
         indicators_of_compromise=iocs,
-        dropped_payload_analyses=payload_analyses,
+        dropped_payload_analyses=[],
         yara_rule_candidate=yara,
-        confidence_score=0.85
+        confidence_score=0.90
     )

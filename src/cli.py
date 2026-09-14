@@ -91,25 +91,28 @@ def _execute_detonation_flow(sample_meta, timeout, mock):
         sample_path=sample_meta["quarantine_path"],
         sha256=sample_meta["sha256"],
         timeout_seconds=timeout,
-        mock_run=mock
+        mock_run=mock,
+        raw_bytes=sample_meta.get("raw_bytes")
     )
-    print(f"    - Status: {detonation_res['status']} ({time.time() - t0:.1f}s)")
+    print(f"    - Status: {detonation_res['status']} ({detonation_res.get('execution_mode', 'standard')}) in {time.time() - t0:.1f}s")
 
     print("[*] Extracting forensic triage artifacts...")
     triage_data = extract_triage_data(detonation_res["output_dir"])
     print(f"    - Spawned Processes: {len(triage_data.get('spawned_processes', []))}")
     print(f"    - Dropped Files: {len(triage_data.get('dropped_files', []))}")
-    print(f"    - Persistence Hooks: {len(triage_data.get('persistence_hooks', []))}")
+    print(f"    - Discovered Network Indicators: {len(triage_data.get('network_indicators', []))}")
 
     print("[*] Synthesizing Threat Intelligence via Gemini...")
     synthesis = synthesize_threat_report(sample_meta, triage_data)
     print(f"    - Classification: {synthesis.threat_classification}")
+    print(f"    - Family: {synthesis.malware_family}")
     print(f"    - Severity Score: {synthesis.threat_severity_score}/10")
     print(f"    - MITRE Techniques: {len(synthesis.mitre_attack_techniques)}")
 
     print("[*] Compiling defanged Threat Analysis Report...")
     report_md = generate_threat_report(sample_meta, triage_data, synthesis)
     report_file = REPORTS_DIR / f"{sample_meta['sha256']}.md"
+    report_file.write_text(report_md, encoding="utf-8")
     print(f"[+] Report generated successfully at: {report_file}")
 
 

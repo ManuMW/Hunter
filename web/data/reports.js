@@ -76,59 +76,50 @@ const THREAT_REPORTS = [
     {
         id: "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451",
         sha256: "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451",
-        title: "MalwareBazaar Ingestion Analysis: 17.4MB Monolithic Linux ELF Binary with Embedded Telnet Scanning",
-        family: "Mirai / Gafgyt",
-        category: "BOTNET",
+        title: "Static Binary Analysis: 17.4MB Monolithic Linux ELF Binary with Embedded PAM Authentication Hooks",
+        family: "Linux.PAM.Backdoor",
+        category: "TROJAN",
         severity: "HIGH",
         severityScore: "7/10",
-        date: "2026-09-13",
+        date: "2026-09-14",
         author: "Hunter Research Team",
         readTime: "5 min read",
-        summary: "Ingested directly from MalwareBazaar (abuse.ch), this 17.4MB monolithic ELF executable features hardcoded brute-force credential dictionaries, SYN/ACK flood routines, and watchdog termination logic targeting competing Linux processes. Analysis revealed secondary artifact extraction into /tmp and persistence scheduling via system cron.",
-        tags: ["BOTNET", "MIRAI", "MALWAREBAZAAR", "TELNET"],
+        summary: "Static reverse engineering of sample e41ff2d7... revealed a 17.4MB monolithic 64-bit Linux ELF binary featuring embedded dynamic references to Pluggable Authentication Modules (libpam.so.0), multithreaded task execution (libpthread.so.0), and obfuscated procfs inspection paths (/proc/seL, /proc/seH). The binary embeds high-entropy security tokens and routines designed to intercept or modify host authentication flows.",
+        tags: ["TROJAN", "PAM_BACKDOOR", "CREDENTIAL_ACCESS", "AUTHENTICATION"],
         mitre: [
-            { id: "T1059.004", name: "Command and Scripting Interpreter: Unix Shell", tactic: "Execution" },
-            { id: "T1053.003", name: "Scheduled Task/Job: Cron", tactic: "Persistence" },
-            { id: "T1564.001", name: "Hide Artifacts: Hidden Files and Directories", tactic: "Defense Evasion" },
-            { id: "T1496", name: "Resource Hijacking", tactic: "Impact" },
-            { id: "T1071.001", name: "Application Layer Protocol: Web Protocols", tactic: "Command and Control" }
+            { id: "T1556.003", name: "Modify Authentication Process: Pluggable Authentication Modules", tactic: "Credential Access" },
+            { id: "T1036", name: "Masquerading", tactic: "Defense Evasion" },
+            { id: "T1027", name: "Obfuscated Files or Information", tactic: "Defense Evasion" }
         ],
         iocs: [
             { type: "SHA-256", value: "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451", description: "Primary 17.4MB ELF sample binary" },
             { type: "SHA-1", value: "0394823f768643300fbb45dbfda42335f89e96d9", description: "SHA-1 cryptographic hash" },
             { type: "MD5", value: "2851ed8ba499d84f938f85ca603d9866", description: "MD5 checksum" },
-            { type: "Network C2", value: "198[.]51[.]100[.]23:4444", description: "Remote connection endpoint (defanged)" },
-            { type: "Persistence Hook", value: "/etc/cron.d/test_persistence", description: "Root-owned cron schedule file" }
+            { type: "Discovered Path", value: "/proc/seL", description: "Obfuscated procfs path string embedded in binary" },
+            { type: "Discovered Path", value: "/proc/seH", description: "Obfuscated procfs path string embedded in binary" },
+            { type: "Discovered Path", value: "/etc/locH", description: "Obfuscated configuration path string embedded in binary" },
+            { type: "Library Hook", value: "libpam.so.0", description: "Linux PAM authentication library import" }
         ],
         behavior: {
             processTree: [
-                "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451 (PID: 88)",
-                "└── /tmp/.hidden_miner -o 198[.]51[.]100[.]23:4444 (PID: 1338)"
+                "[Static Binary Triage Mode] Analysis conducted on raw executable.",
+                "└── Full dynamic air-gapped container detonation designated for Cloud Detonation Host."
             ],
-            droppedPayloads: [
-                {
-                    path: "/tmp/.hidden_miner",
-                    size: "2,048 bytes",
-                    magic: "ELF 64-bit LSB executable, dynamically linked",
-                    strings: [
-                        "198[.]51[.]100[.]23:4444",
-                        "/tmp/.hidden_miner"
-                    ]
-                }
-            ]
+            droppedPayloads: []
         },
-        yaraRule: `rule Linux_Botnet_Monolithic_Hunter {
+        yaraRule: `rule Linux_PAM_Backdoor_e41ff2d7 {
     meta:
-        description = "Detects monolithic Linux ELF botnets with embedded execution routines"
+        description = "Detects Linux ELF binaries importing PAM authentication hooks with obfuscated procfs references"
         author = "Hunter Security Labs"
-        date = "2026-09-13"
-        severity = "High"
+        date = "2026-09-14"
+        sha256 = "e41ff2d7a604a3ee1c1d99502b390adf9cf7119f1b6b7902ea26b88c148cb451"
     strings:
-        $p1 = "/tmp/.hidden_miner" ascii
-        $p2 = "/etc/cron.d/test_persistence" ascii
-        $c1 = "198.51.100.23:4444" ascii
+        $pam = "libpam.so.0" ascii
+        $p1 = "/proc/seL" ascii
+        $p2 = "/proc/seH" ascii
+        $p3 = "/etc/locH" ascii
     condition:
-        uint32(0) == 0x464c457f and all of ($p*, $c*)
+        uint32(0) == 0x464c457f and $pam and 2 of ($p*)
 }`
     },
     {

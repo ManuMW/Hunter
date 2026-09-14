@@ -138,7 +138,13 @@ async function handleHashSubmit() {
         return;
     }
 
-    // Check if report already exists
+    if (!/^[a-f0-9]{64}$/.test(hash)) {
+        showToast("Invalid format. Please enter a 64-character SHA-256 hex string.");
+        if (input) input.focus();
+        return;
+    }
+
+    // Check if report already exists in the catalog
     const existing = (typeof THREAT_REPORTS !== "undefined" && Array.isArray(THREAT_REPORTS))
         ? THREAT_REPORTS.find(r => r.sha256.toLowerCase() === hash || r.id.toLowerCase() === hash)
         : null;
@@ -148,112 +154,61 @@ async function handleHashSubmit() {
         return;
     }
 
-    // Otherwise run simulated dynamic analysis workflow
-    await runDynamicAnalysis(hash);
+    // Honest queue notification modal for Cloud Detonation Host
+    showCloudQueueModal(hash);
 }
 
-// Dynamic analysis simulation stepper
-async function runDynamicAnalysis(hash) {
-    isAnalyzing = true;
-    const statusModal = document.getElementById("statusModalBackdrop");
-    const hashDisplay = document.getElementById("statusHashDisplay");
-    const btnAnalyze = document.getElementById("btnAnalyze");
+function showCloudQueueModal(hash) {
+    const modalBackdrop = document.getElementById("reportModalBackdrop");
+    const modalBadge = document.getElementById("modalBadge");
+    const modalContent = document.getElementById("modalContent");
 
-    if (hashDisplay) {
-        hashDisplay.textContent = `Target SHA-256: ${hash}`;
+    if (modalBadge) {
+        modalBadge.textContent = "INGESTION QUEUE";
     }
 
-    if (btnAnalyze) {
-        btnAnalyze.disabled = true;
-        btnAnalyze.textContent = "Analyzing...";
-    }
+    modalContent.innerHTML = `
+        <h1 class="report-headline">Sample Queued for Cloud Sandbox Detonation</h1>
+        
+        <div class="report-meta-grid">
+            <div>
+                <span class="meta-field-label">SUBMITTED SHA-256</span>
+                <span class="meta-field-value">${escapeHtml(hash)}</span>
+            </div>
+            <div>
+                <span class="meta-field-label">QUEUE STATUS</span>
+                <span class="meta-field-value" style="color: var(--elastic-teal); font-weight: 700;">ENQUEUED</span>
+            </div>
+            <div>
+                <span class="meta-field-label">DETONATION TARGET</span>
+                <span class="meta-field-value">Cloud Host VM</span>
+            </div>
+        </div>
 
-    // Reset step indicators
-    const stepIds = ["step-1", "step-2", "step-3", "step-4"];
-    stepIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.className = "status-step";
-        }
-    });
+        <h3 class="report-h3">Automated Pipeline Lifecycle</h3>
+        <p class="report-para">
+            This SHA-256 hash has been validated and registered. The automated Cloud Detonation Host worker executes:
+        </p>
+        <ol style="margin-left: 20px; font-size: 14px; line-height: 1.8; color: var(--text-body); margin-bottom: 20px;">
+            <li>Acquisition and decryption of the Linux sample binary from the MalwareBazaar repository.</li>
+            <li>Spin-up of an ephemeral air-gapped Docker sandbox (90-second execution window).</li>
+            <li>Forensic artifact triage (process tree, dropped payloads, persistence mechanisms) via Velociraptor.</li>
+            <li>Synthesis of verified MITRE ATT&amp;CK mapping and IoC tables published directly to this hub.</li>
+        </ol>
 
-    if (statusModal) {
-        statusModal.classList.add("active");
+        <p class="report-para" style="color: var(--text-muted); font-size: 13px;">
+            Published reports are cataloged as soon as cloud execution and triage synthesis complete.
+        </p>
+
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+            <button class="btn-submit" onclick="closeReportModal()">Acknowledge</button>
+        </div>
+    `;
+
+    if (modalBackdrop) {
+        modalBackdrop.classList.add("active");
         document.body.style.overflow = "hidden";
     }
-
-    // Step through execution stages
-    for (let i = 0; i < stepIds.length; i++) {
-        const el = document.getElementById(stepIds[i]);
-        if (el) el.className = "status-step active";
-        await sleep(750);
-        if (el) el.className = "status-step done";
-    }
-
-    await sleep(400);
-
-    // Close status modal
-    closeStatusModal();
-
-    if (btnAnalyze) {
-        btnAnalyze.disabled = false;
-        btnAnalyze.textContent = "Analyze Hash";
-    }
-    isAnalyzing = false;
-
-    // Create and prepend a generated report entry based on analysis
-    const newReport = createSampleReport(hash);
-    if (typeof THREAT_REPORTS !== "undefined") {
-        THREAT_REPORTS.unshift(newReport);
-        renderReports();
-    }
-
-    openReportModal(newReport.id);
-    showToast("Analysis complete. Threat report generated.");
-}
-
-function createSampleReport(hash) {
-    const dateStr = new Date().toISOString().split("T")[0];
-    return {
-        id: hash,
-        sha256: hash,
-        title: `Dynamic Behavioral Analysis: Automated ELF Detonation and IoC Extraction`,
-        family: "Linux Malware",
-        category: "DROPPER",
-        severity: "HIGH",
-        severityScore: "7.5/10",
-        date: dateStr,
-        author: "Hunter Research Team",
-        readTime: "3 min read",
-        summary: `Dynamic behavioral execution analysis completed for binary ${hash}. The sample demonstrated evasion heuristics, attempted socket initialization, and spawned auxiliary processes in temporary runtime storage before payload termination.`,
-        tags: ["DROPPER", "DYNAMIC_ANALYSIS", "PERSISTENCE"],
-        mitre: [
-            { id: "T1059.004", name: "Unix Shell", tactic: "Execution" },
-            { id: "T1564.001", name: "Hidden Files and Directories", tactic: "Defense Evasion" },
-            { id: "T1071.001", name: "Web Protocols", tactic: "Command and Control" }
-        ],
-        iocs: [
-            { type: "SHA-256 (Primary)", value: hash, description: "Detonated sample binary" },
-            { type: "Network Endpoint", value: "203[.]0[.]113[.]42:8080", description: "Outbound beacon target (defanged)" },
-            { type: "Dropped Binary", value: "/tmp/.sys_agent", description: "Secondary dropped payload" }
-        ],
-        behavior: {
-            processTree: [
-                `${hash.substring(0, 16)}.bin (PID: 201)`,
-                `└── /bin/sh -c cp /proc/self/exe /tmp/.sys_agent`,
-                `└── /tmp/.sys_agent --daemon (PID: 205)`
-            ],
-            droppedPayloads: [
-                {
-                    path: "/tmp/.sys_agent",
-                    size: "142 KB",
-                    magic: "ELF 64-bit LSB executable, x86-64",
-                    strings: ["203[.]0[.]113[.]42", "CONNECT_FAILED", "DAEMON_MODE"]
-                }
-            ]
-        },
-        yaraRule: `rule Linux_Threat_${hash.substring(0, 8)}_Hunter {\n    meta:\n        description = "Automated detection rule generated by Hunter Security Labs"\n        sha256 = "${hash}"\n        date = "${dateStr}"\n    strings:\n        $s1 = "/tmp/.sys_agent" ascii\n        $s2 = "203.0.113.42" ascii\n    condition:\n        uint32(0) == 0x464c457f and any of them\n}`
-    };
 }
 
 // 2. Presenting Reports: Open Modal
