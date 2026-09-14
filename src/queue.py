@@ -1,10 +1,13 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+
+import httpx
 
 from src.runner import run_detonation
 from src.triage import extract_triage_data
@@ -12,6 +15,35 @@ from src.ai_synthesis import synthesize_threat_report
 from src.report_generator import generate_threat_report
 
 logger = logging.getLogger(__name__)
+
+
+def notify_github_actions(sha256: str):
+    """
+    Triggers GitHub Actions repository_dispatch event to fetch and commit the report.
+    Requires GITHUB_DISPATCH_TOKEN and GITHUB_REPO set in environment.
+    """
+    token = os.getenv("GITHUB_DISPATCH_TOKEN")
+    repo = os.getenv("GITHUB_REPO", "ManuMW/Hunter")
+    if not token or not repo:
+        return
+    try:
+        dispatch_url = f"https://api.github.com/repos/{repo}/dispatches"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Hunter-Detonation-Host"
+        }
+        payload = {
+            "event_type": "publish_report",
+            "client_payload": {"sha256": sha256}
+        }
+        resp = httpx.post(dispatch_url, json=payload, headers=headers, timeout=10.0)
+        if resp.status_code in [200, 204]:
+            logger.info(f"[+] Successfully dispatched GitHub Actions sync for {sha256}")
+        else:
+            logger.warning(f"[!] GitHub dispatch returned HTTP {resp.status_code}: {resp.text}")
+    except Exception as e:
+        logger.warning(f"[!] Failed to dispatch GitHub Actions sync: {e}")
 
 
 def synthesis_to_report_dict(
@@ -215,6 +247,7 @@ class DetonationWorker:
                 )
                 task.report_data = report_dict
                 append_to_catalog(report_dict)
+                notify_github_actions(task.sha256)
                 
                 task.status = "completed"
                 task.completed_at = datetime.now(timezone.utc).isoformat()
