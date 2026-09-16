@@ -14,7 +14,7 @@ let activePollingInterval = null;
 const API_BASE_URL = window.HUNTER_API_URL || (
     window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
         ? "http://localhost:8000"
-        : ""
+        : "https://asleep-usher-undress.ngrok-free.dev"
 );
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -186,7 +186,8 @@ async function submitToDetonationApi(hash) {
         const response = await fetch(`${API_BASE_URL}/api/submit-hash`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "ngrok-skip-browser-warning": "true"
             },
             body: JSON.stringify({ sha256: hash })
         });
@@ -232,7 +233,9 @@ function startTaskPolling(taskId, hash) {
 
     const poll = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`);
+            const res = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
+                headers: { "ngrok-skip-browser-warning": "true" }
+            });
             if (!res.ok) return;
 
             const task = await res.json();
@@ -298,7 +301,9 @@ function updateStepState(stepId, state) {
 
 async function fetchAndDisplayReport(hash) {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/reports/${hash}?format=json`);
+        const res = await fetch(`${API_BASE_URL}/api/reports/${hash}?format=json`, {
+            headers: { "ngrok-skip-browser-warning": "true" }
+        });
         if (res.ok) {
             const reportData = await res.json();
             if (reportData && !THREAT_REPORTS.some(r => r.sha256 === hash)) {
