@@ -18,3 +18,22 @@
 4. **Zero Synthetic / Fake Telemetry**:
    - Never generate or inject hardcoded mock IOCs, fake process trees, or synthetic forensic dumps.
    - Analysis must always be derived from genuine static decomposition or genuine dynamic container telemetry.
+
+## Core Invariant: Jira Task Lifecycle & Gated Execution
+1. **Mandatory Jira Intake**:
+   - For every task, feature, or bug fix requested by the user, the assistant must first consult Jira (Project `HUN`).
+   - Never begin implementation or modify codebase files before performing the Jira intake workflow.
+
+2. **Collision & Deduplication Check**:
+   - Search existing issues using JQL text search (`project = HUN AND (summary ~ "..." OR description ~ "...")`) to check if the problem or task already has an open or closed ticket.
+   - If an existing or colliding ticket is identified, flag the relationship, link the issue, and inform the user.
+
+3. **Autonomous Ticket Creation**:
+   - If no matching ticket exists, create a new issue in project `HUN` (`Task` or `Bug`) with clear summary, detailed description, and relevant labels.
+
+4. **Strict User Authorization Gate**:
+   - After identifying or creating the ticket, the assistant must pause and present the ticket ID, summary, and scope to the user.
+   - The assistant must NOT begin building, editing files, or running build commands until the user explicitly confirms (e.g., "work on it", "proceed", "build this").
+
+5. **Execution & Traceability**:
+   - Once authorized, perform the work and reference the Jira issue key (e.g., `HUN-XX`) in commit messages and summaries.
