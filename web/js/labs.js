@@ -197,6 +197,11 @@ async function submitToDetonationApi(hash) {
             throw new Error(errData.detail || `Server returned HTTP ${response.status}`);
         }
 
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+            throw new Error("Detonation backend is not currently connected to the public endpoint.");
+        }
+
         const data = await response.json();
 
         // If report was already cached on server
