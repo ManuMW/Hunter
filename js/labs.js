@@ -17,6 +17,9 @@ const API_BASE_URL = window.HUNTER_API_URL || (
         : "https://asleep-usher-undress.ngrok-free.dev"
 );
 
+// Serverless Cloud Function to wake up Cloud Detonation Host on demand
+const WAKE_FUNCTION_URL = "https://asia-south1-stockbot-scheduled.cloudfunctions.net/wake-detonation-host";
+
 document.addEventListener("DOMContentLoaded", () => {
     initFilters();
     initHashInput();
@@ -168,8 +171,62 @@ async function handleHashSubmit() {
         return;
     }
 
-    // Submit live to Detonation Host API with dynamic real-time polling
     await submitToDetonationApi(hash);
+}
+
+// Automatic Wake-on-Demand trigger for Cloud VM
+async function ensureHostIsAwake(onStatusUpdate) {
+    try {
+        const probe = await fetch(`${API_BASE_URL}/health`, {
+            headers: { "ngrok-skip-browser-warning": "true" }
+        });
+        if (probe.ok) {
+            const data = await probe.json().catch(() => ({}));
+            if (data.status === "healthy") {
+                return true;
+            }
+        }
+    } catch (e) {
+        // Host in standby, wake up
+    }
+
+    if (onStatusUpdate) onStatusUpdate("Host in standby. Sending wake signal to Cloud VM...");
+
+    try {
+        await fetch(WAKE_FUNCTION_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        });
+    } catch (e) {
+        console.warn("Wake signal sent:", e);
+    }
+
+    const startTime = Date.now();
+    const timeoutMs = 45000;
+
+    while (Date.now() - startTime < timeoutMs) {
+        await new Promise(r => setTimeout(r, 2500));
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        if (onStatusUpdate) {
+            onStatusUpdate(`Initializing cloud sandbox & tunnels... (${elapsed}s)`);
+        }
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/health`, {
+                headers: { "ngrok-skip-browser-warning": "true" }
+            });
+            if (res.ok) {
+                const json = await res.json().catch(() => ({}));
+                if (json.status === "healthy") {
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Initializing...
+        }
+    }
+
+    throw new Error("Cloud host took longer than expected to initialize. Please try again in a few seconds.");
 }
 
 async function submitToDetonationApi(hash) {
@@ -183,6 +240,15 @@ async function submitToDetonationApi(hash) {
     showDynamicProgressModal(hash);
 
     try {
+        const statusText = document.getElementById("statusHashDisplay");
+        await ensureHostIsAwake((msg) => {
+            if (statusText) statusText.textContent = msg;
+        });
+
+        if (statusText) {
+            statusText.textContent = `Submitting sample to detonation pipeline...`;
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/submit-hash`, {
             method: "POST",
             headers: {
