@@ -19,3 +19,7 @@ artifacts/
 
 # Generated reports are kept or gitignored as desired
 # reports/
+
+# Local agent rules & developer notes (not pushed to public repo)
+AGENTS.md
+CONTEXT.md

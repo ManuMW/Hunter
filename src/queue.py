@@ -105,8 +105,8 @@ def synthesis_to_report_dict(
 
 
 def append_to_catalog(report_dict: Dict[str, Any]):
-    """Appends newly detonated report to data/reports.js and web/data/reports.js."""
-    for file_path in [Path("data/reports.js"), Path("web/data/reports.js")]:
+    """Appends newly detonated report to data/reports.js."""
+    for file_path in [Path("data/reports.js")]:
         if not file_path.exists():
             continue
         try:
