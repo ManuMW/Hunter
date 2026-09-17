@@ -5,6 +5,51 @@
 
 const THREAT_REPORTS = [
     {
+        "id": "d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522",
+        "sha256": "d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522",
+        "title": "Threat Analysis Report: d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522 (Mirai)",
+        "family": "Mirai",
+        "category": "BOTNET",
+        "severity": "CRITICAL",
+        "severityScore": "8/10",
+        "date": "2026-09-17",
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": "The analyzed sample (SHA256: d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522) is a 32-bit MIPS LSB executable targeting Linux-based embedded systems and IoT devices. The binary is statically linked and stripped of section headers to obstruct reverse engineering and static detection mechanisms.\n\nDuring the 2-second detonation in an air-gapped sandbox environment, the process executed under PID 25 without spawning child processes or dropping secondary stage files onto the host filesystem. Based on the target architecture (MIPS LSB) and binary features, the sample exhibits characteristic traits of a Mirai-family DDoS botnet agent designed to compromise Linux IoT devices.\n\nRisk mitigation requires restricting access to embedded Linux devices, enforcing strict network egress filtering, and monitoring for anomalous binary execution within IoT infrastructure.",
+        "tags": [
+            "BOTNET",
+            "MIRAI",
+            "SEVERITY_8"
+        ],
+        "mitre": [
+            {
+                "id": "T1059.004",
+                "name": "Unix Shell",
+                "tactic": "Execution"
+            },
+            {
+                "id": "T1027.002",
+                "name": "Software Packing / Stripped Symbols",
+                "tactic": "Defense Evasion"
+            }
+        ],
+        "iocs": [
+            {
+                "type": "sha256",
+                "value": "d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522",
+                "description": "SHA256 digest of the analyzed MIPS botnet binary"
+            }
+        ],
+        "behavior": {
+            "processTree": [
+                "Process Execution: PID 25 executed and exited within 2 seconds.",
+                "Anti-Analysis: ELF header analysis indicates 'no section header'."
+            ],
+            "droppedPayloads": []
+        },
+        "yaraRule": "rule Mirai_MIPS_Stripped_Binary {\n    meta:\n        description = \"Detects stripped 32-bit MIPS LSB ELF binaries characteristic of Mirai botnet variants\"\n        sha256 = \"d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522\"\n    strings:\n        $elf_magic = { 7F 45 4C 46 01 01 01 }\n    condition:\n        $elf_magic at 0 and uint16(0x12) == 0x0008 and filesize == 119112\n}"
+    },
+    {
         id: "4ba17752a7fa6fb2afb70124ea1e8651999487d1f4ece5196ab1c37beee75718",
         sha256: "4ba17752a7fa6fb2afb70124ea1e8651999487d1f4ece5196ab1c37beee75718",
         title: "Static Binary Analysis: 25KB 32-bit x86 Linux ELF Botnet (Gafgyt) with Embedded C2 Endpoints",
