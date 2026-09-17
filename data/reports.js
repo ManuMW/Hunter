@@ -5,6 +5,66 @@
 
 const THREAT_REPORTS = [
     {
+        "id": "f46a6a9e3b3cbcb2acb79c41df1faeebb02601db5f77e0a54aa6d82e1f48e1f8",
+        "sha256": "f46a6a9e3b3cbcb2acb79c41df1faeebb02601db5f77e0a54aa6d82e1f48e1f8",
+        "title": "Threat Analysis Report: arm8 (Mirai-Variant)",
+        "family": "Mirai-Variant",
+        "category": "BOTNET",
+        "severity": "HIGH",
+        "severityScore": "7/10",
+        "date": "2026-09-17",
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": "The analyzed sample 'arm8' (SHA256: f46a6a9e3b3cbcb2acb79c41df1faeebb02601db5f77e0a54aa6d82e1f48e1f8) is a 64-bit ARM (aarch64) ELF executable configured as a Position-Independent Executable (PIE). The binary relies on the Android dynamic linker '/system/bin/linker64', indicating it specifically targets ARM64-based Android or embedded IoT devices. Binaries matching this naming convention and architectural profile are commonly associated with cross-compiled DDoS botnets such as Mirai, Gafgyt, or related IoT malware families.\n\nDuring sandbox detonation, the sample executed for 2 seconds before terminating cleanly without spawning additional processes or dropping secondary files. This short execution duration and lack of operational persistence hooks in the local sandbox environment reflect standard botnet payload behavior when disconnected from an active Command and Control (C2) server or when operating within air-gapped evaluation environments.\n\nRisks associated with this payload include the compromise of ARM64 mobile and embedded Linux devices, enlisting endpoints into botnet infrastructure, and enabling remote control for distributed denial-of-service (DDoS) attacks or further payload deployment. Organizations utilizing ARM64 Linux or Android embedded infrastructure should monitor for unauthorized binary execution and abnormal outbound connectivity.",
+        "tags": [
+            "BOTNET",
+            "MIRAI-VARIANT",
+            "SEVERITY_7"
+        ],
+        "mitre": [
+            {
+                "id": "T1059.004",
+                "name": "Unix Shell",
+                "tactic": "Execution"
+            },
+            {
+                "id": "T1071.001",
+                "name": "Web Protocols",
+                "tactic": "Command and Control"
+            },
+            {
+                "id": "T1406",
+                "name": "Obfuscated Files or Information",
+                "tactic": "Defense Evasion"
+            }
+        ],
+        "iocs": [
+            {
+                "type": "hash",
+                "value": "f46a6a9e3b3cbcb2acb79c41df1faeebb02601db5f77e0a54aa6d82e1f48e1f8",
+                "description": "SHA256 hash of the arm8 ELF binary"
+            },
+            {
+                "type": "filename",
+                "value": "arm8",
+                "description": "Filename of the analyzed ARM64 binary payload"
+            },
+            {
+                "type": "path",
+                "value": "/system/bin/linker64",
+                "description": "Dynamic linker interpreter specified in the binary header"
+            }
+        ],
+        "behavior": {
+            "processTree": [
+                "Execution: ELF 64-bit LSB pie executable, ARM aarch64, dynamically linked, interpreter /system/bin/linker64, stripped",
+                "Defense Evasion: Stripped dynamic binary header status"
+            ],
+            "droppedPayloads": []
+        },
+        "yaraRule": "rule ELF_ARM64_Botnet_arm8 { meta: description = \"Detects ARM64 ELF botnet binary targeting Android/Linux runtime environment\" author = \"Threat Intel Analyst\" sha256 = \"f46a6a9e3b3cbcb2acb79c41df1faeebb02601db5f77e0a54aa6d82e1f48e1f8\" strings: $elf_header = { 7F 45 4C 46 02 01 01 00 } $linker = \"/system/bin/linker64\" condition: $elf_header at 0 and $linker and filesize < 500KB }"
+    },
+    {
         "id": "d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522",
         "sha256": "d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522",
         "title": "Threat Analysis Report: d97bb4393a46028fd499df9edf4851f33f9a68ffee7fef3b4d06e871f2209522 (Mirai)",
