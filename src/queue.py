@@ -152,13 +152,36 @@ class DetonationTask:
         }
 
 
+MAX_QUEUE_CAPACITY = 10
+
+
+class QueueFullError(Exception):
+    """Raised when the detonation queue reaches maximum capacity (10 tasks)."""
+    pass
+
+
 class DetonationWorker:
-    def __init__(self):
-        self._queue: asyncio.Queue[DetonationTask] = asyncio.Queue()
+    def __init__(self, max_capacity: int = MAX_QUEUE_CAPACITY):
+        self.max_capacity = max_capacity
+        self._queue: asyncio.Queue[DetonationTask] = asyncio.Queue(maxsize=max_capacity)
         self._tasks: Dict[str, DetonationTask] = {}
         self._sha256_to_task: Dict[str, str] = {}
         self._worker_task: Optional[asyncio.Task] = None
         self._running = False
+
+    def is_full(self) -> bool:
+        """Returns True if active (queued or in-flight) tasks reach maximum capacity."""
+        active_count = sum(
+            1 for t in self._tasks.values()
+            if t.status in ["queued", "detonating", "extracting_artifacts", "analyzing"]
+        )
+        return active_count >= self.max_capacity
+
+    def active_task_count(self) -> int:
+        return sum(
+            1 for t in self._tasks.values()
+            if t.status in ["queued", "detonating", "extracting_artifacts", "analyzing"]
+        )
 
     async def start(self):
         """Starts the sequential background worker loop."""
@@ -166,7 +189,7 @@ class DetonationWorker:
             return
         self._running = True
         self._worker_task = asyncio.create_task(self._worker_loop())
-        logger.info("[*] Detonation sequential worker loop started.")
+        logger.info(f"[*] Detonation sequential worker loop started. (Capacity: {self.max_capacity})")
 
     async def stop(self):
         """Stops the worker cleanly."""
@@ -176,11 +199,13 @@ class DetonationWorker:
 
     def submit_sample(self, sample_meta: Dict[str, Any]) -> DetonationTask:
         """Enqueues a sample for sequential processing."""
+        if self.is_full():
+            raise QueueFullError(f"Detonation queue is at maximum capacity ({self.max_capacity} tasks).")
         task = DetonationTask(sample_meta)
         self._tasks[task.task_id] = task
         self._sha256_to_task[task.sha256] = task.task_id
         self._queue.put_nowait(task)
-        logger.info(f"[*] Enqueued sample {task.sha256} with task ID: {task.task_id}")
+        logger.info(f"[*] Enqueued sample {task.sha256} with task ID: {task.task_id} (Active: {self.active_task_count()}/{self.max_capacity})")
         return task
 
     def get_task(self, task_id: str) -> Optional[DetonationTask]:

@@ -100,7 +100,9 @@ def health_check():
     return {
         "status": "healthy",
         "docker_available": is_docker_available(),
-        "queued_tasks": worker._queue.qsize()
+        "queued_tasks": worker._queue.qsize(),
+        "active_tasks": worker.active_task_count(),
+        "queue_capacity": worker.max_capacity
     }
 
 
@@ -116,8 +118,9 @@ async def submit_hash(
     1. Validates Cloudflare Turnstile token (if enabled).
     2. Checks Report Cache (returns existing report instantly with 0 compute & 0 quota consumed).
     3. Checks In-Flight Tasks (joins active detonation run if already queued).
-    4. Enforces 5 detonations/day quota per client.
-    5. Queries MalwareBazaar, validates Linux threat, downloads encrypted binary, and enqueues detonation.
+    4. Enforces maximum 10-sample FIFO queue capacity (HTTP 503 if full, 0 quota spent).
+    5. Enforces 5 detonations/day quota per client.
+    6. Queries MalwareBazaar, validates Linux threat, downloads encrypted binary, and enqueues detonation.
     """
     client_ip = get_real_client_ip(request)
     client_identifier = build_client_identifier(client_ip, x_client_id)
@@ -156,6 +159,14 @@ async def submit_hash(
             filename=existing_task.sample_meta.get("filename"),
             message="Detonation run is currently in progress for this sample.",
             daily_quota_remaining=remaining_quota
+        )
+
+    # Step 4b: Check Queue Capacity (Max 10 tasks)
+    if worker.is_full():
+        logger.warning(f"[*] Queue capacity reached ({worker.active_task_count()}/{worker.max_capacity}). Rejecting submission for {sha256}.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"The detonation sandbox queue is currently at maximum capacity ({worker.max_capacity}/{worker.max_capacity} active tasks). Please wait a few moments for active detonations to complete and try again."
         )
 
     # Step 5: Enforce Daily Quota (Only applies to new detonations)

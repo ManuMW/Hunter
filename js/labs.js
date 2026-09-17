@@ -260,6 +260,15 @@ async function submitToDetonationApi(hash) {
 
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
+            closeStatusModal();
+            if (response.status === 404) {
+                showSampleNotFoundModal(hash, errData.detail);
+                return;
+            }
+            if (response.status === 503 && (errData.detail || "").toLowerCase().includes("queue")) {
+                showQueueFullModal(hash);
+                return;
+            }
             throw new Error(errData.detail || `Server returned HTTP ${response.status}`);
         }
 
@@ -466,6 +475,136 @@ function showCloudQueueModal(hash) {
     }
 }
 
+// Persistent Modal: Sample Not Found in MalwareBazaar
+function showSampleNotFoundModal(hash, detailMessage) {
+    const modalBackdrop = document.getElementById("reportModalBackdrop");
+    const modalBadge = document.getElementById("modalBadge");
+    const modalContent = document.getElementById("modalContent");
+
+    if (modalBadge) {
+        modalBadge.textContent = "SAMPLE UNCATALOGED";
+        modalBadge.style.background = "#ff4d4f";
+        modalBadge.style.color = "#ffffff";
+    }
+
+    modalContent.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <div style="width: 42px; height: 42px; border-radius: 50%; background: rgba(255, 77, 79, 0.12); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                ⚠️
+            </div>
+            <div>
+                <h1 class="report-headline" style="margin: 0; font-size: 20px;">Sample Not Found in Threat Repositories</h1>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-muted);">Uncataloged SHA-256 Digest</p>
+            </div>
+        </div>
+
+        <div class="report-meta-grid" style="margin: 20px 0;">
+            <div>
+                <span class="meta-field-label">SUBMITTED SHA-256</span>
+                <span class="meta-field-value" style="font-family: monospace; font-size: 11px;">${escapeHtml(hash)}</span>
+            </div>
+            <div>
+                <span class="meta-field-label">REPOSITORY STATUS</span>
+                <span class="meta-field-value" style="color: #ff4d4f; font-weight: 700;">NOT FOUND (404)</span>
+            </div>
+            <div>
+                <span class="meta-field-label">INGESTION SOURCE</span>
+                <span class="meta-field-value">MalwareBazaar (abuse.ch)</span>
+            </div>
+        </div>
+
+        <p class="report-para" style="margin-bottom: 16px;">
+            The submitted SHA-256 hash was not found in MalwareBazaar or public threat repositories. 
+            Automated dynamic sandboxing, memory forensics, and reverse engineering require an authentic binary payload to detonate.
+        </p>
+
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6; color: var(--text-body);">
+            <strong>Why did this happen?</strong>
+            <ul style="margin: 8px 0 0 18px; padding: 0;">
+                <li>The hash may be mistyped or does not match a known malware binary.</li>
+                <li>The sample has not yet been uploaded or shared to MalwareBazaar.</li>
+                <li>Hunter strictly adheres to authentic forensic telemetry; synthetic or fake reports are never generated.</li>
+            </ul>
+        </div>
+
+        <p class="report-para" style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">
+            You can verify the SHA-256 digest on <a href="https://bazaar.abuse.ch/browse/" target="_blank" style="color: var(--elastic-blue); text-decoration: underline;">MalwareBazaar</a> or browse verified intelligence reports below.
+        </p>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn-submit" onclick="closeReportModal()">Dismiss</button>
+        </div>
+    `;
+
+    if (modalBackdrop) {
+        modalBackdrop.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+}
+
+// Persistent Modal: Detonation Queue Full (10/10)
+function showQueueFullModal(hash) {
+    const modalBackdrop = document.getElementById("reportModalBackdrop");
+    const modalBadge = document.getElementById("modalBadge");
+    const modalContent = document.getElementById("modalContent");
+
+    if (modalBadge) {
+        modalBadge.textContent = "DETONATION QUEUE FULL";
+        modalBadge.style.background = "#faad14";
+        modalBadge.style.color = "#000000";
+    }
+
+    modalContent.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <div style="width: 42px; height: 42px; border-radius: 50%; background: rgba(250, 173, 20, 0.12); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                ⏳
+            </div>
+            <div>
+                <h1 class="report-headline" style="margin: 0; font-size: 20px;">Detonation Queue at Capacity (10/10)</h1>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-muted);">Cloud Sandbox Busy</p>
+            </div>
+        </div>
+
+        <div class="report-meta-grid" style="margin: 20px 0;">
+            <div>
+                <span class="meta-field-label">SUBMITTED SHA-256</span>
+                <span class="meta-field-value" style="font-family: monospace; font-size: 11px;">${escapeHtml(hash)}</span>
+            </div>
+            <div>
+                <span class="meta-field-label">QUEUE LOAD</span>
+                <span class="meta-field-value" style="color: #faad14; font-weight: 700;">10 / 10 ACTIVE TASKS</span>
+            </div>
+            <div>
+                <span class="meta-field-label">QUOTA IMPACT</span>
+                <span class="meta-field-value" style="color: var(--elastic-teal); font-weight: 700;">0 QUOTA SPENT</span>
+            </div>
+        </div>
+
+        <p class="report-para" style="margin-bottom: 16px;">
+            The Cloud Detonation Sandbox is currently executing live behavioral analysis on 10 samples simultaneously. 
+            To maintain hardware isolation and prevent container memory contention, incoming detonations are temporarily held until an active slot frees up.
+        </p>
+
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6; color: var(--text-body);">
+            Detonations run in ephemeral 90-second sandboxes. As soon as an active sample completes, a queue slot opens automatically.
+        </div>
+
+        <p class="report-para" style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">
+            Please wait 1&ndash;2 minutes for an active analysis to complete, then click <strong>Retry Analysis</strong>.
+        </p>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn-clear" onclick="closeReportModal()">Close</button>
+            <button class="btn-submit" onclick="closeReportModal(); fillSample('${escapeHtml(hash)}')">Retry Analysis</button>
+        </div>
+    `;
+
+    if (modalBackdrop) {
+        modalBackdrop.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+}
+
 // 2. Presenting Reports: Open Modal
 function openReportModal(reportId) {
     if (typeof THREAT_REPORTS === "undefined") return;
@@ -597,6 +736,11 @@ function openReportModal(reportId) {
 function closeReportModal(e) {
     if (e && e.target !== e.currentTarget) return;
     const modalBackdrop = document.getElementById("reportModalBackdrop");
+    const modalBadge = document.getElementById("modalBadge");
+    if (modalBadge) {
+        modalBadge.style.background = "";
+        modalBadge.style.color = "";
+    }
     if (modalBackdrop) {
         modalBackdrop.classList.remove("active");
     }
