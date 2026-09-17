@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,79 @@ from src.ai_synthesis import synthesize_threat_report
 from src.report_generator import generate_threat_report
 
 logger = logging.getLogger(__name__)
+
+
+def publish_report_to_git(sha256: str) -> bool:
+    """
+    Commits and pushes generated report markdown and updated catalog (data/reports.js)
+    directly to GitHub main branch.
+    Adheres to HUN-8.
+    """
+    try:
+        report_file = f"reports/{sha256}.md"
+        data_file = "data/reports.js"
+
+        if not Path(".git").exists():
+            logger.info("[*] Not a git repository, skipping git publish.")
+            return False
+
+        # 1. Stage changes
+        subprocess.run(
+            ["git", "add", report_file, data_file],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15.0
+        )
+
+        # 2. Check if anything is staged
+        status_check = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            capture_output=True,
+            timeout=10.0
+        )
+        if status_check.returncode == 0:
+            logger.info(f"[*] No new git changes to commit for {sha256}.")
+            return True
+
+        # 3. Commit
+        commit_msg = f"chore(report): publish threat report for {sha256} [HUN-8]"
+        subprocess.run(
+            ["git", "commit", "-m", commit_msg],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15.0
+        )
+        logger.info(f"[+] Committed threat report for {sha256}.")
+
+        # 4. Pull --rebase in case remote updated
+        subprocess.run(
+            ["git", "pull", "--rebase", "origin", "main"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30.0
+        )
+
+        # 5. Push to origin main
+        subprocess.run(
+            ["git", "push", "origin", "main"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30.0
+        )
+        logger.info(f"[+] Successfully pushed threat report {sha256} to GitHub main branch.")
+        return True
+
+    except subprocess.CalledProcessError as e:
+        stderr_msg = e.stderr.strip() if e.stderr else str(e)
+        logger.error(f"[!] Git publish failed for {sha256}: {stderr_msg}")
+        return False
+    except Exception as e:
+        logger.error(f"[!] Unexpected error in publish_report_to_git for {sha256}: {e}")
+        return False
 
 
 def notify_github_actions(sha256: str):
@@ -272,6 +346,7 @@ class DetonationWorker:
                 )
                 task.report_data = report_dict
                 append_to_catalog(report_dict)
+                await asyncio.to_thread(publish_report_to_git, task.sha256)
                 notify_github_actions(task.sha256)
                 
                 task.status = "completed"
