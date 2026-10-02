@@ -879,6 +879,22 @@ function openReportModal(reportId) {
                 <pre><code>${escapeHtml(report.yaraRule)}</code></pre>
             </div>
         ` : ''}
+
+        <!-- Threat Intelligence Export (STIX 2.1 & MISP) -->
+        <div class="report-export-section">
+            <div class="export-text">
+                <span class="export-title">Threat Intelligence Feeds (STIX 2.1 &amp; MISP)</span>
+                <p class="export-subtitle">Download machine-readable threat feeds for automated ingestion into SIEMs/SOARs (Splunk, Elastic, Sentinel, OpenCTI, MISP).</p>
+            </div>
+            <div class="export-buttons">
+                <button class="btn-export" onclick="exportReportStix('${escapeHtml(report.sha256)}')">
+                    <span>📥</span> Download STIX 2.1
+                </button>
+                <button class="btn-export" onclick="exportReportMisp('${escapeHtml(report.sha256)}')">
+                    <span>🛡️</span> Download MISP
+                </button>
+            </div>
+        </div>
     `;
 
     if (modalBackdrop) {
@@ -965,4 +981,308 @@ function escapeHtml(text) {
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ==========================================================================
+// Threat Intelligence Export (STIX 2.1 & MISP)
+// ==========================================================================
+function downloadJsonFile(dataObj, filename) {
+    const jsonStr = JSON.stringify(dataObj, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${filename}`);
+}
+
+function generateStix21FromReport(report) {
+    const sha256 = report.sha256 || report.id || "unknown";
+    const family = report.family || "Unclassified Threat";
+    const category = (report.category || "malware").toLowerCase();
+    const summary = report.summary || `Threat report for ${sha256}`;
+    const dateStr = report.date ? `${report.date}T00:00:00.000Z` : new Date().toISOString();
+    const identityId = "identity--f78b17b0-7b24-4f4c-8854-3bf1c8e19191";
+
+    const malwareId = `malware--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'malware-' + sha256.substring(0, 16)}`;
+    const indicatorId = `indicator--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'indicator-' + sha256.substring(0, 16)}`;
+
+    const objects = [
+        {
+            type: "identity",
+            spec_version: "2.1",
+            id: identityId,
+            created: dateStr,
+            modified: dateStr,
+            name: "Hunter Security Labs",
+            description: "Automated Cloud Sandbox Detonation & Linux Threat Research",
+            identity_class: "organization"
+        },
+        {
+            type: "malware",
+            spec_version: "2.1",
+            id: malwareId,
+            created: dateStr,
+            modified: dateStr,
+            name: family,
+            is_family: true,
+            malware_types: [category === "cryptominer" ? "miner" : category],
+            description: summary,
+            created_by_ref: identityId
+        },
+        {
+            type: "indicator",
+            spec_version: "2.1",
+            id: indicatorId,
+            created: dateStr,
+            modified: dateStr,
+            name: `Malicious Sample SHA-256: ${sha256.substring(0, 16)}...`,
+            description: `Observed binary digest for ${family}`,
+            indicator_types: ["malicious-activity"],
+            pattern: `[file:hashes.'SHA-256' = '${sha256}']`,
+            pattern_type: "stix",
+            pattern_version: "2.1",
+            valid_from: dateStr,
+            created_by_ref: identityId
+        },
+        {
+            type: "relationship",
+            spec_version: "2.1",
+            id: `relationship--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'rel-' + sha256.substring(0, 16)}`,
+            created: dateStr,
+            modified: dateStr,
+            relationship_type: "indicates",
+            source_ref: indicatorId,
+            target_ref: malwareId,
+            created_by_ref: identityId
+        }
+    ];
+
+    // MITRE ATT&CK techniques
+    (report.mitre || []).forEach(m => {
+        if (!m.id) return;
+        const attackId = `attack-pattern--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'attack-' + m.id.replace(/[^a-zA-Z0-9]/g, '')}`;
+        objects.push({
+            type: "attack-pattern",
+            spec_version: "2.1",
+            id: attackId,
+            created: dateStr,
+            modified: dateStr,
+            name: m.name || m.id,
+            description: `MITRE ATT&CK technique ${m.id} observed during detonation`,
+            external_references: [
+                {
+                    source_name: "mitre-attack",
+                    external_id: m.id,
+                    url: `https://attack.mitre.org/techniques/${m.id.replace('.', '/')}/`
+                }
+            ],
+            created_by_ref: identityId
+        });
+        objects.push({
+            type: "relationship",
+            spec_version: "2.1",
+            id: `relationship--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'rel-uses-' + m.id.replace(/[^a-zA-Z0-9]/g, '')}`,
+            created: dateStr,
+            modified: dateStr,
+            relationship_type: "uses",
+            source_ref: malwareId,
+            target_ref: attackId,
+            created_by_ref: identityId
+        });
+    });
+
+    // Secondary IOCs
+    (report.iocs || []).forEach(ioc => {
+        if (!ioc.value || ioc.value === sha256) return;
+        const iocType = (ioc.type || "").toLowerCase();
+        let pattern = null;
+        if (iocType === "ipv4" || iocType === "ip" || iocType === "c2") {
+            pattern = `[ipv4-addr:value = '${ioc.value}']`;
+        } else if (iocType === "domain") {
+            pattern = `[domain-name:value = '${ioc.value}']`;
+        } else if (iocType === "md5") {
+            pattern = `[file:hashes.'MD5' = '${ioc.value}']`;
+        }
+        if (pattern) {
+            const secId = `indicator--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'sec-ind-' + Math.random().toString(36).substring(7)}`;
+            objects.push({
+                type: "indicator",
+                spec_version: "2.1",
+                id: secId,
+                created: dateStr,
+                modified: dateStr,
+                name: `Observed IOC: ${ioc.value}`,
+                description: ioc.description || "Extracted IOC",
+                indicator_types: ["malicious-activity"],
+                pattern: pattern,
+                pattern_type: "stix",
+                pattern_version: "2.1",
+                valid_from: dateStr,
+                created_by_ref: identityId
+            });
+            objects.push({
+                type: "relationship",
+                spec_version: "2.1",
+                id: `relationship--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'rel-ioc-' + Math.random().toString(36).substring(7)}`,
+                created: dateStr,
+                modified: dateStr,
+                relationship_type: "indicates",
+                source_ref: secId,
+                target_ref: malwareId,
+                created_by_ref: identityId
+            });
+        }
+    });
+
+    // YARA rule indicator
+    if (report.yaraRule) {
+        const yaraId = `indicator--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'yara-' + sha256.substring(0, 16)}`;
+        objects.push({
+            type: "indicator",
+            spec_version: "2.1",
+            id: yaraId,
+            created: dateStr,
+            modified: dateStr,
+            name: `YARA Candidate Rule: ${family}`,
+            description: `Automated detection rule for ${family}`,
+            indicator_types: ["malicious-activity"],
+            pattern: report.yaraRule,
+            pattern_type: "yara",
+            valid_from: dateStr,
+            created_by_ref: identityId
+        });
+        objects.push({
+            type: "relationship",
+            spec_version: "2.1",
+            id: `relationship--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'rel-yara-' + sha256.substring(0, 16)}`,
+            created: dateStr,
+            modified: dateStr,
+            relationship_type: "indicates",
+            source_ref: yaraId,
+            target_ref: malwareId,
+            created_by_ref: identityId
+        });
+    }
+
+    return {
+        type: "bundle",
+        id: `bundle--${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'bundle-' + sha256.substring(0, 16)}`,
+        spec_version: "2.1",
+        objects: objects
+    };
+}
+
+function generateMispFromReport(report) {
+    const sha256 = report.sha256 || report.id || "unknown";
+    const family = report.family || "Unclassified Threat";
+    const title = report.title || `Threat Report: ${family}`;
+    const dateStr = report.date || new Date().toISOString().split("T")[0];
+    const sev = (report.severity || "HIGH").toUpperCase();
+    const threatLevel = (sev === "CRITICAL" || sev === "HIGH") ? "1" : sev === "MEDIUM" ? "2" : "3";
+
+    const attributes = [
+        {
+            type: "sha256",
+            category: "Payload delivery",
+            value: sha256,
+            comment: `Primary SHA-256 for ${family} ELF sample`,
+            to_ids: true
+        }
+    ];
+
+    (report.iocs || []).forEach(ioc => {
+        if (!ioc.value || ioc.value === sha256) return;
+        const iocType = (ioc.type || "").toLowerCase();
+        let mType = "other";
+        let mCat = "Artifacts dropped";
+        if (iocType === "ipv4" || iocType === "ip" || iocType === "c2") {
+            mType = "ip-dst";
+            mCat = "Network activity";
+        } else if (iocType === "domain") {
+            mType = "domain";
+            mCat = "Network activity";
+        } else if (iocType === "md5") {
+            mType = "md5";
+            mCat = "Payload delivery";
+        }
+        attributes.push({
+            type: mType,
+            category: mCat,
+            value: ioc.value,
+            comment: ioc.description || "Observed indicator",
+            to_ids: true
+        });
+    });
+
+    if (report.yaraRule) {
+        attributes.push({
+            type: "yara",
+            category: "Artifacts dropped",
+            value: report.yaraRule,
+            comment: `Synthesized detection rule for ${family}`,
+            to_ids: false
+        });
+    }
+
+    const tags = [
+        { name: "tlp:clear" },
+        { name: `hunter:family="${family}"` },
+        { name: `hunter:severity="${sev}"` },
+        { name: `hunter:category="${report.category || 'MALWARE'}"` }
+    ];
+
+    (report.mitre || []).forEach(m => {
+        if (m.id) tags.push({ name: `misp-galaxy:mitre-attack-pattern="${m.id}"` });
+    });
+
+    return {
+        Event: {
+            uuid: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : 'misp-' + sha256.substring(0, 16),
+            info: title,
+            date: dateStr,
+            threat_level_id: threatLevel,
+            analysis: "2",
+            distribution: "3",
+            published: true,
+            orgc: {
+                name: "Hunter Security Labs",
+                uuid: "f78b17b0-7b24-4f4c-8854-3bf1c8e19191"
+            },
+            Attribute: attributes,
+            Tag: tags
+        }
+    };
+}
+
+function exportReportStix(sha256) {
+    const report = (typeof THREAT_REPORTS !== "undefined" && Array.isArray(THREAT_REPORTS))
+        ? THREAT_REPORTS.find(r => (r.sha256 || r.id) === sha256)
+        : null;
+
+    if (!report) {
+        showToast("Report not found in local catalog.");
+        return;
+    }
+
+    const bundle = generateStix21FromReport(report);
+    downloadJsonFile(bundle, `hunter-stix21-${sha256.substring(0, 12)}.json`);
+}
+
+function exportReportMisp(sha256) {
+    const report = (typeof THREAT_REPORTS !== "undefined" && Array.isArray(THREAT_REPORTS))
+        ? THREAT_REPORTS.find(r => (r.sha256 || r.id) === sha256)
+        : null;
+
+    if (!report) {
+        showToast("Report not found in local catalog.");
+        return;
+    }
+
+    const mispEvent = generateMispFromReport(report);
+    downloadJsonFile(mispEvent, `hunter-misp-${sha256.substring(0, 12)}.json`);
 }

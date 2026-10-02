@@ -15,6 +15,7 @@ from src.config import REPORTS_DIR, CLIENT_DAILY_QUOTA
 from src.quarantine import quarantine_sample
 from src.runner import is_docker_available
 from src.queue import worker, synthesis_to_report_dict
+from src.stix_misp import generate_stix21_bundle, generate_misp_event
 from src.malwarebazaar import (
     get_sample_info,
     download_sample_binary,
@@ -234,16 +235,83 @@ def get_task_status(task_id: str):
     )
 
 
+def _resolve_report_dict(sha256: str) -> Optional[Dict[str, Any]]:
+    """Resolves report dictionary from in-memory worker, data/reports.js, or markdown frontmatter."""
+    task = worker.get_task_by_sha256(sha256)
+    if task and task.report_data:
+        return task.report_data
+    if task and task.synthesis:
+        return synthesis_to_report_dict(
+            sha256=sha256,
+            filename=task.sample_meta.get("filename", "sample"),
+            synthesis=task.synthesis
+        )
+
+    # Check data/reports.js
+    for reports_path in [Path("data/reports.js")]:
+        if reports_path.exists():
+            try:
+                content = reports_path.read_text(encoding="utf-8")
+                if sha256 in content:
+                    prefix = "const THREAT_REPORTS = [\n"
+                    idx = content.find(prefix)
+                    if idx != -1:
+                        raw = content[idx + len(prefix) - 2:].rstrip().rstrip(";")
+                        import json
+                        reports_list = json.loads(raw)
+                        for r in reports_list:
+                            if r.get("sha256") == sha256 or r.get("id") == sha256:
+                                return r
+            except Exception as e:
+                logger.warning(f"Failed to parse report {sha256} from data/reports.js: {e}")
+
+    report_file = REPORTS_DIR / f"{sha256}.md"
+    if not report_file.exists():
+        return None
+
+    # Fallback: parse from markdown frontmatter
+    content = report_file.read_text(encoding="utf-8")
+    title_match = re.search(r"title:\s*(.+)", content)
+    family_match = re.search(r'malware_family:\s*"([^"]+)"', content)
+    class_match = re.search(r'classification:\s*"([^"]+)"', content)
+    score_match = re.search(r"severity_score:\s*(\d+)", content)
+    score = int(score_match.group(1)) if score_match else 7
+    family = family_match.group(1) if family_match else "Generic"
+    classification = class_match.group(1) if class_match else "THREAT"
+    return {
+        "id": sha256,
+        "sha256": sha256,
+        "title": title_match.group(1) if title_match else f"Threat Analysis Report - {sha256[:12]}",
+        "family": family,
+        "category": classification.upper(),
+        "severity": "CRITICAL" if score >= 8 else "HIGH" if score >= 6 else "MEDIUM",
+        "severityScore": f"{score}/10",
+        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": "Full threat intelligence report cataloged in repository.",
+        "tags": [classification.upper(), family.upper()],
+        "mitre": [],
+        "iocs": [{"type": "sha256", "value": sha256, "description": "Sample SHA-256"}],
+        "behavior": {"processTree": ["Analysis completed."], "droppedPayloads": []},
+        "yaraRule": ""
+    }
+
+
 @app.get("/api/reports/{sha256}", tags=["Reports"])
 def get_threat_report(sha256: str, format: str = "markdown"):
     """
     Retrieves the generated Threat Analysis Report for a sample.
     - format=markdown: Returns the raw Markdown report.
-    - format=json: Returns structured JSON report data for web catalog rendering.
+    - format=json: Returns structured JSON report data.
+    - format=stix: Returns an OASIS STIX 2.1 Bundle.
+    - format=misp: Returns a standard MISP Event document.
     """
     sha256 = sha256.strip().lower()
+    report_dict = _resolve_report_dict(sha256)
     report_file = REPORTS_DIR / f"{sha256}.md"
-    if not report_file.exists():
+
+    if not report_file.exists() and not report_dict:
         task = worker.get_task_by_sha256(sha256)
         if task and task.status not in ["completed", "failed"]:
             return JSONResponse(
@@ -253,45 +321,50 @@ def get_threat_report(sha256: str, format: str = "markdown"):
         raise HTTPException(status_code=404, detail=f"No report found for SHA256 {sha256}.")
 
     if format == "json":
-        task = worker.get_task_by_sha256(sha256)
-        if task and task.report_data:
-            return task.report_data
-        if task and task.synthesis:
-            return synthesis_to_report_dict(
-                sha256=sha256,
-                filename=task.sample_meta.get("filename", "sample"),
-                synthesis=task.synthesis
-            )
-        # Parse from markdown frontmatter when task is not in memory
-        content = report_file.read_text(encoding="utf-8")
-        title_match = re.search(r"title:\s*(.+)", content)
-        family_match = re.search(r'malware_family:\s*"([^"]+)"', content)
-        class_match = re.search(r'classification:\s*"([^"]+)"', content)
-        score_match = re.search(r"severity_score:\s*(\d+)", content)
-        score = int(score_match.group(1)) if score_match else 7
-        family = family_match.group(1) if family_match else "Generic"
-        classification = class_match.group(1) if class_match else "THREAT"
-        return {
-            "id": sha256,
-            "sha256": sha256,
-            "title": title_match.group(1) if title_match else f"Threat Analysis Report - {sha256[:12]}",
-            "family": family,
-            "category": classification.upper(),
-            "severity": "CRITICAL" if score >= 8 else "HIGH" if score >= 6 else "MEDIUM",
-            "severityScore": f"{score}/10",
-            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "author": "Hunter Research Team",
-            "readTime": "4 min read",
-            "summary": "Full threat intelligence report cataloged in repository.",
-            "tags": [classification.upper(), family.upper()],
-            "mitre": [],
-            "iocs": [{"type": "sha256", "value": sha256, "description": "Sample SHA-256"}],
-            "behavior": {"processTree": ["Analysis completed."], "droppedPayloads": []},
-            "yaraRule": ""
-        }
+        return report_dict
 
-    content = report_file.read_text(encoding="utf-8")
+    if format == "stix":
+        if not report_dict:
+            raise HTTPException(status_code=404, detail=f"Could not build STIX 2.1 bundle for {sha256}.")
+        return generate_stix21_bundle(report_dict)
+
+    if format == "misp":
+        if not report_dict:
+            raise HTTPException(status_code=404, detail=f"Could not build MISP event for {sha256}.")
+        return generate_misp_event(report_dict)
+
+    content = report_file.read_text(encoding="utf-8") if report_file.exists() else ""
     return PlainTextResponse(content=content, media_type="text/markdown")
+
+
+@app.get("/api/reports/{sha256}/stix", tags=["Threat Intelligence Feeds"])
+def export_stix21_report(sha256: str):
+    """Exports threat intelligence as an OASIS STIX 2.1 JSON bundle."""
+    sha256 = sha256.strip().lower()
+    report_dict = _resolve_report_dict(sha256)
+    if not report_dict:
+        raise HTTPException(status_code=404, detail=f"No report found for SHA256 {sha256}.")
+    bundle = generate_stix21_bundle(report_dict)
+    return JSONResponse(
+        content=bundle,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="hunter-stix21-{sha256[:12]}.json"'}
+    )
+
+
+@app.get("/api/reports/{sha256}/misp", tags=["Threat Intelligence Feeds"])
+def export_misp_report(sha256: str):
+    """Exports threat intelligence as a MISP Event JSON document."""
+    sha256 = sha256.strip().lower()
+    report_dict = _resolve_report_dict(sha256)
+    if not report_dict:
+        raise HTTPException(status_code=404, detail=f"No report found for SHA256 {sha256}.")
+    misp_event = generate_misp_event(report_dict)
+    return JSONResponse(
+        content=misp_event,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="hunter-misp-{sha256[:12]}.json"'}
+    )
 
 
 @app.get("/api/reports", tags=["Reports"])

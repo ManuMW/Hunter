@@ -99,3 +99,37 @@ def test_get_threat_report_json(tmp_path, monkeypatch):
     assert data["category"] == "BOTNET"
     assert data["severity"] == "CRITICAL"
 
+
+def test_get_threat_report_stix_and_misp(tmp_path, monkeypatch):
+    """Verifies that STIX 2.1 and MISP endpoints generate valid threat intel bundles."""
+    monkeypatch.setattr("src.api.REPORTS_DIR", tmp_path)
+    sha256 = "ae4cb49ce4fa6aeb8f38ca703bc661cde36fbcadc05e3862ba3d8f7737ce7dcc"
+    fake_report = tmp_path / f"{sha256}.md"
+    fake_report.write_text(
+        '---\ntitle: Threat Analysis Report - test.elf\nmalware_family: "Mirai"\nclassification: "Botnet"\nseverity_score: 8\n---\n\n# Threat Analysis Report\n',
+        encoding="utf-8"
+    )
+
+    # 1. Test format=stix
+    resp_stix = client.get(f"/api/reports/{sha256}?format=stix")
+    assert resp_stix.status_code == 200
+    stix_data = resp_stix.json()
+    assert stix_data["type"] == "bundle"
+    assert stix_data["spec_version"] == "2.1"
+
+    # 2. Test dedicated /stix route
+    resp_stix_route = client.get(f"/api/reports/{sha256}/stix")
+    assert resp_stix_route.status_code == 200
+    assert resp_stix_route.headers.get("content-disposition", "").startswith("attachment;")
+
+    # 3. Test format=misp
+    resp_misp = client.get(f"/api/reports/{sha256}?format=misp")
+    assert resp_misp.status_code == 200
+    misp_data = resp_misp.json()
+    assert "Event" in misp_data
+
+    # 4. Test dedicated /misp route
+    resp_misp_route = client.get(f"/api/reports/{sha256}/misp")
+    assert resp_misp_route.status_code == 200
+    assert resp_misp_route.headers.get("content-disposition", "").startswith("attachment;")
+
