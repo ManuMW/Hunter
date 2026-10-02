@@ -347,16 +347,19 @@ async function ensureHostIsAwake(onStatusUpdate) {
     if (onStatusUpdate) onStatusUpdate("Host in standby. Sending wake signal to Cloud VM...");
 
     try {
-        await fetch(WAKE_FUNCTION_URL, {
+        const wakeResp = await fetch(WAKE_FUNCTION_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" }
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "wake" })
         });
+        const wakeData = await wakeResp.json().catch(() => ({}));
+        console.log("Wake signal response:", wakeData);
     } catch (e) {
-        console.warn("Wake signal sent:", e);
+        console.warn("Wake signal sent (error/warning):", e);
     }
 
     const startTime = Date.now();
-    const timeoutMs = 45000;
+    const timeoutMs = 60000;
 
     while (Date.now() - startTime < timeoutMs) {
         await new Promise(r => setTimeout(r, 2500));

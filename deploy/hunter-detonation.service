@@ -2,6 +2,7 @@
 Description=Hunter Threat Detonation Host Worker & API Service
 After=network.target docker.service
 Requires=docker.service
+Wants=ngrok.service
 
 [Service]
 Type=simple
