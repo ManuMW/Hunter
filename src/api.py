@@ -252,15 +252,15 @@ def _resolve_report_dict(sha256: str) -> Optional[Dict[str, Any]]:
         if reports_path.exists():
             try:
                 content = reports_path.read_text(encoding="utf-8")
-                if sha256 in content:
-                    prefix = "const THREAT_REPORTS = [\n"
-                    idx = content.find(prefix)
-                    if idx != -1:
-                        raw = content[idx + len(prefix) - 2:].rstrip().rstrip(";")
+                clean_sha = sha256.lower().strip()
+                if clean_sha in content.lower():
+                    start_idx = content.find("[")
+                    end_idx = content.rfind("]")
+                    if start_idx != -1 and end_idx != -1:
                         import json
-                        reports_list = json.loads(raw)
+                        reports_list = json.loads(content[start_idx:end_idx + 1])
                         for r in reports_list:
-                            if r.get("sha256") == sha256 or r.get("id") == sha256:
+                            if (r.get("sha256") or r.get("id") or "").lower() == clean_sha:
                                 return r
             except Exception as e:
                 logger.warning(f"Failed to parse report {sha256} from data/reports.js: {e}")

@@ -186,16 +186,28 @@ def append_to_catalog(report_dict: Dict[str, Any]):
             continue
         try:
             content = file_path.read_text(encoding="utf-8")
-            if report_dict["sha256"] in content:
+            clean_sha = report_dict["sha256"].lower().strip()
+            if clean_sha in content.lower():
                 continue
-            prefix = "const THREAT_REPORTS = [\n"
-            idx = content.find(prefix)
-            if idx != -1:
-                json_str = json.dumps(report_dict, indent=4)
-                indented = "\n".join("    " + line for line in json_str.splitlines()) + ",\n"
-                new_content = content[:idx + len(prefix)] + indented + content[idx + len(prefix):]
-                file_path.write_text(new_content, encoding="utf-8")
-                logger.info(f"[+] Appended report {report_dict['sha256']} to {file_path}")
+
+            start_idx = content.find("[")
+            end_idx = content.rfind("]")
+            if start_idx != -1 and end_idx != -1:
+                raw = content[start_idx:end_idx + 1]
+                try:
+                    reports = json.loads(raw)
+                except Exception:
+                    reports = []
+                reports.insert(0, report_dict)
+                header = (
+                    "/**\n"
+                    " * Hunter Security Labs - Cataloged Threat Intelligence Reports\n"
+                    " * Generated from live detonation runs in Hunter\n"
+                    " */\n\n"
+                    "const THREAT_REPORTS = "
+                )
+                file_path.write_text(f"{header}{json.dumps(reports, indent=4)};\n", encoding="utf-8")
+                logger.info(f"[+] Appended report {clean_sha} to {file_path}")
         except Exception as e:
             logger.warning(f"Failed to append report to {file_path}: {e}")
 
