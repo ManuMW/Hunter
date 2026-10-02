@@ -73,13 +73,43 @@
             <div class="section-bar">
                 <div class="section-title-box">
                     <h2 class="section-title">Threat Reports</h2>
+                    <span class="report-count-badge" id="reportCountBadge">Loading reports...</span>
                 </div>
-                <div class="filter-pills" id="categoryFilters">
-                    <button class="filter-pill active" data-category="ALL">All Reports</button>
-                    <button class="filter-pill" data-category="BOTNET">Botnets</button>
-                    <button class="filter-pill" data-category="CRYPTOMINER">Cryptominers</button>
-                    <button class="filter-pill" data-category="TROJAN">Trojans &amp; Backdoors</button>
-                    <button class="filter-pill" data-category="DROPPER">Droppers</button>
+
+                <!-- Instant Search Bar -->
+                <div class="report-search-box">
+                    <span class="report-search-icon">🔍</span>
+                    <input type="text" id="reportSearchInput" placeholder="Search by SHA-256, malware family, IOC, or MITRE ID..." autocomplete="off" />
+                    <button class="btn-clear-search" id="btnClearReportSearch" onclick="clearReportSearch()" style="display: none;" title="Clear search">✕</button>
+                </div>
+            </div>
+
+            <!-- Facet Filter Bars -->
+            <div class="filters-container">
+                <div class="filter-group">
+                    <span class="filter-group-label">Category:</span>
+                    <div class="filter-pills" id="categoryFilters">
+                        <button class="filter-pill active" data-category="ALL">All Categories</button>
+                        <button class="filter-pill" data-category="BOTNET">Botnets</button>
+                        <button class="filter-pill" data-category="CRYPTOMINER">Cryptominers</button>
+                        <button class="filter-pill" data-category="TROJAN">Trojans &amp; Backdoors</button>
+                        <button class="filter-pill" data-category="DROPPER">Droppers</button>
+                        <button class="filter-pill" data-category="BENIGN">Benign</button>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <span class="filter-group-label">Severity:</span>
+                    <div class="filter-pills" id="severityFilters">
+                        <button class="filter-pill severity-pill active" data-severity="ALL">All Severities</button>
+                        <button class="filter-pill severity-pill" data-severity="CRITICAL"><span class="severity-dot dot-critical"></span>Critical</button>
+                        <button class="filter-pill severity-pill" data-severity="HIGH"><span class="severity-dot dot-high"></span>High</button>
+                        <button class="filter-pill severity-pill" data-severity="MEDIUM"><span class="severity-dot dot-medium"></span>Medium</button>
+                    </div>
+                </div>
+
+                <div class="filter-group-right">
+                    <button class="btn-reset-filters" id="btnResetFilters" onclick="resetReportFilters()" style="display: none;">↺ Reset Filters</button>
                 </div>
             </div>
 

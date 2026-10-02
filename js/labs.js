@@ -7,6 +7,8 @@
  */
 
 let currentCategory = "ALL";
+let currentSeverity = "ALL";
+let searchQuery = "";
 let isAnalyzing = false;
 let activePollingInterval = null;
 
@@ -22,21 +24,90 @@ const WAKE_FUNCTION_URL = "https://asia-south1-stockbot-scheduled.cloudfunctions
 
 document.addEventListener("DOMContentLoaded", () => {
     initFilters();
+    initReportSearch();
     initHashInput();
     renderReports();
 });
 
-// Category filtering
+// Category and Severity filtering
 function initFilters() {
-    const filterButtons = document.querySelectorAll("#categoryFilters .filter-pill");
-    filterButtons.forEach(btn => {
+    // Category pills
+    const categoryButtons = document.querySelectorAll("#categoryFilters .filter-pill");
+    categoryButtons.forEach(btn => {
         btn.addEventListener("click", () => {
-            filterButtons.forEach(b => b.classList.remove("active"));
+            categoryButtons.forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
-            currentCategory = btn.getAttribute("data-category");
+            currentCategory = btn.getAttribute("data-category") || "ALL";
             renderReports();
         });
     });
+
+    // Severity pills
+    const severityButtons = document.querySelectorAll("#severityFilters .filter-pill");
+    severityButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            severityButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            currentSeverity = btn.getAttribute("data-severity") || "ALL";
+            renderReports();
+        });
+    });
+}
+
+// Instant Report Search Input behaviors
+function initReportSearch() {
+    const input = document.getElementById("reportSearchInput");
+    const btnClear = document.getElementById("btnClearReportSearch");
+    if (!input) return;
+
+    input.addEventListener("input", () => {
+        searchQuery = input.value.trim();
+        if (btnClear) {
+            btnClear.style.display = searchQuery.length > 0 ? "flex" : "none";
+        }
+        renderReports();
+    });
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            clearReportSearch();
+        }
+    });
+}
+
+function clearReportSearch() {
+    const input = document.getElementById("reportSearchInput");
+    const btnClear = document.getElementById("btnClearReportSearch");
+    if (input) {
+        input.value = "";
+        searchQuery = "";
+        input.focus();
+    }
+    if (btnClear) {
+        btnClear.style.display = "none";
+    }
+    renderReports();
+}
+
+function resetReportFilters() {
+    currentCategory = "ALL";
+    currentSeverity = "ALL";
+    searchQuery = "";
+
+    const searchInput = document.getElementById("reportSearchInput");
+    const btnClearSearch = document.getElementById("btnClearReportSearch");
+    if (searchInput) searchInput.value = "";
+    if (btnClearSearch) btnClearSearch.style.display = "none";
+
+    document.querySelectorAll("#categoryFilters .filter-pill").forEach(btn => {
+        btn.classList.toggle("active", (btn.getAttribute("data-category") || "ALL") === "ALL");
+    });
+
+    document.querySelectorAll("#severityFilters .filter-pill").forEach(btn => {
+        btn.classList.toggle("active", (btn.getAttribute("data-severity") || "ALL") === "ALL");
+    });
+
+    renderReports();
 }
 
 // Hash input field behaviors
@@ -83,29 +154,108 @@ function fillSample(hash) {
     handleHashSubmit();
 }
 
-// Render reports list
+// Render reports list with full search, facet filtering, and counters
 function renderReports() {
     const grid = document.getElementById("reportsGrid");
+    const countBadge = document.getElementById("reportCountBadge");
+    const btnReset = document.getElementById("btnResetFilters");
     if (!grid) return;
 
     if (typeof THREAT_REPORTS === "undefined" || !Array.isArray(THREAT_REPORTS)) {
         grid.innerHTML = `<p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px;">No reports available.</p>`;
+        if (countBadge) countBadge.textContent = "0 Reports";
         return;
     }
 
+    const totalCount = THREAT_REPORTS.length;
+
+    // Filter reports
     const filtered = THREAT_REPORTS.filter(report => {
-        if (currentCategory === "ALL") return true;
-        return (report.category && report.category.toUpperCase() === currentCategory) ||
-               (report.tags && report.tags.some(t => t.toUpperCase() === currentCategory));
+        // 1. Category Facet
+        if (currentCategory !== "ALL") {
+            const cat = (report.category || "").toUpperCase();
+            const tags = (report.tags || []).map(t => (t || "").toUpperCase());
+            const family = (report.family || "").toUpperCase();
+            const matchesCat = cat === currentCategory || 
+                               tags.includes(currentCategory) || 
+                               family.includes(currentCategory);
+            if (!matchesCat) return false;
+        }
+
+        // 2. Severity Facet
+        if (currentSeverity !== "ALL") {
+            const sev = (report.severity || "").toUpperCase();
+            if (sev !== currentSeverity) return false;
+        }
+
+        // 3. Search Query (SHA-256, Title, Family, Summary, Tags, MITRE, IOCs)
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            const hashMatch = (report.sha256 || "").toLowerCase().includes(q) || (report.id || "").toLowerCase().includes(q);
+            const titleMatch = (report.title || "").toLowerCase().includes(q);
+            const familyMatch = (report.family || "").toLowerCase().includes(q);
+            const summaryMatch = (report.summary || "").toLowerCase().includes(q);
+            const tagsMatch = (report.tags || []).some(t => (t || "").toLowerCase().includes(q));
+            const mitreMatch = (report.mitre || []).some(m => 
+                (m.id || "").toLowerCase().includes(q) || 
+                (m.name || "").toLowerCase().includes(q) || 
+                (m.tactic || "").toLowerCase().includes(q)
+            );
+            const iocMatch = (report.iocs || []).some(ioc => 
+                (ioc.value || "").toLowerCase().includes(q) || 
+                (ioc.description || "").toLowerCase().includes(q)
+            );
+
+            if (!hashMatch && !titleMatch && !familyMatch && !summaryMatch && !tagsMatch && !mitreMatch && !iocMatch) {
+                return false;
+            }
+        }
+
+        return true;
     });
 
+    // Update count badge & reset button state
+    if (countBadge) {
+        countBadge.textContent = `Showing ${filtered.length} of ${totalCount} Reports`;
+    }
+    if (btnReset) {
+        const isFiltered = (currentCategory !== "ALL" || currentSeverity !== "ALL" || searchQuery.length > 0);
+        btnReset.style.display = isFiltered ? "inline-flex" : "none";
+    }
+
+    // Empty state handling
     if (filtered.length === 0) {
-        grid.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-muted);">
-                <p style="font-weight: 600; color: var(--text-title); margin-bottom: 4px;">No threat reports found in this category</p>
-                <p style="font-size: 13px;">Select another category or view all reports.</p>
-            </div>
-        `;
+        const isHexHash = /^[a-f0-9]{64}$/i.test(searchQuery);
+
+        if (isHexHash) {
+            grid.innerHTML = `
+                <div class="search-empty-state">
+                    <div class="empty-icon">🛡️</div>
+                    <h3 class="empty-title">Uncataloged SHA-256 Hash</h3>
+                    <p class="empty-desc">
+                        The sample <span class="empty-hash">${escapeHtml(searchQuery)}</span> is not in the published threat catalog yet.
+                        You can detonate it in the Cloud Sandbox now.
+                    </p>
+                    <div style="margin-top: 18px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                        <button class="btn-submit" onclick="fillSample('${escapeHtml(searchQuery)}')">Detonate in Cloud Sandbox &rarr;</button>
+                        <button class="btn-clear" onclick="resetReportFilters()">Clear Search</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            grid.innerHTML = `
+                <div class="search-empty-state">
+                    <div class="empty-icon">🔎</div>
+                    <h3 class="empty-title">No Matching Threat Reports</h3>
+                    <p class="empty-desc">
+                        No published reports match your active search and filter criteria.
+                    </p>
+                    <div style="margin-top: 18px;">
+                        <button class="btn-clear" onclick="resetReportFilters()">↺ Clear All Filters</button>
+                    </div>
+                </div>
+            `;
+        }
         return;
     }
 
@@ -115,10 +265,14 @@ function renderReports() {
             ? hash.substring(0, 10) + "..." + hash.substring(hash.length - 8)
             : hash;
 
+        // Visual severity dot
+        const sevUpper = (report.severity || "MEDIUM").toUpperCase();
+        const sevClass = sevUpper === "CRITICAL" ? "dot-critical" : sevUpper === "HIGH" ? "dot-high" : "dot-medium";
+
         return `
             <article class="report-card" onclick="openReportModal('${report.id}')">
                 <div class="card-tag-row">
-                    <span class="card-pill">${escapeHtml(report.family || report.category || "THREAT")}</span>
+                    <span class="card-pill"><span class="severity-dot ${sevClass}"></span> ${escapeHtml(report.family || report.category || "THREAT")}</span>
                     <span class="card-date">${escapeHtml(report.date || "")}</span>
                 </div>
                 <h3 class="card-title">${escapeHtml(report.title)}</h3>
