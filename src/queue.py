@@ -14,6 +14,7 @@ from src.runner import run_detonation
 from src.triage import extract_triage_data
 from src.ai_synthesis import synthesize_threat_report
 from src.report_generator import generate_threat_report
+from src.db import db
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,14 @@ class DetonationWorker:
         if self._running:
             return
         self._running = True
+
+        # Recover any interrupted tasks from previous run and clean old retention
+        try:
+            db.recover_interrupted_tasks()
+            db.prune_expired_records(retention_days=7)
+        except Exception as e:
+            logger.warning(f"Database recovery/pruning exception: {e}")
+
         self._worker_task = asyncio.create_task(self._worker_loop())
         logger.info(f"[*] Detonation sequential worker loop started. (Capacity: {self.max_capacity})")
 
@@ -278,16 +287,66 @@ class DetonationWorker:
         task = DetonationTask(sample_meta)
         self._tasks[task.task_id] = task
         self._sha256_to_task[task.sha256] = task.task_id
+
+        # Persist task initially to SQLite
+        try:
+            db.save_task({
+                "task_id": task.task_id,
+                "sha256": task.sha256,
+                "filename": task.sample_meta.get("filename"),
+                "status": task.status,
+                "created_at": task.created_at,
+                "sample_meta": task.sample_meta
+            })
+        except Exception as e:
+            logger.warning(f"Failed to persist task {task.task_id} to DB: {e}")
+
         self._queue.put_nowait(task)
         logger.info(f"[*] Enqueued sample {task.sha256} with task ID: {task.task_id} (Active: {self.active_task_count()}/{self.max_capacity})")
         return task
 
     def get_task(self, task_id: str) -> Optional[DetonationTask]:
-        return self._tasks.get(task_id)
+        t = self._tasks.get(task_id)
+        if t:
+            return t
+        # Check SQLite database for persistent/historical records
+        try:
+            row = db.get_task(task_id)
+            if row:
+                recovered = DetonationTask(row.get("sample_meta") or {"sha256": row["sha256"], "filename": row.get("filename")})
+                recovered.task_id = row["task_id"]
+                recovered.status = row["status"]
+                recovered.created_at = row["created_at"]
+                recovered.completed_at = row.get("completed_at")
+                recovered.error = row.get("error")
+                recovered.report_path = row.get("report_path")
+                recovered.report_data = row.get("report_data")
+                return recovered
+        except Exception as e:
+            logger.warning(f"Error querying task {task_id} from DB: {e}")
+        return None
 
     def get_task_by_sha256(self, sha256: str) -> Optional[DetonationTask]:
-        task_id = self._sha256_to_task.get(sha256)
-        return self._tasks.get(task_id) if task_id else None
+        clean_hash = sha256.lower().strip()
+        task_id = self._sha256_to_task.get(clean_hash)
+        if task_id and task_id in self._tasks:
+            return self._tasks[task_id]
+        # Check SQLite database for persistent/historical records
+        try:
+            row = db.get_task_by_sha256(clean_hash)
+            if row:
+                recovered = DetonationTask(row.get("sample_meta") or {"sha256": row["sha256"], "filename": row.get("filename")})
+                recovered.task_id = row["task_id"]
+                recovered.status = row["status"]
+                recovered.created_at = row["created_at"]
+                recovered.completed_at = row.get("completed_at")
+                recovered.error = row.get("error")
+                recovered.report_path = row.get("report_path")
+                recovered.report_data = row.get("report_data")
+                return recovered
+        except Exception as e:
+            logger.warning(f"Error querying task for hash {clean_hash} from DB: {e}")
+        return None
 
     def list_tasks(self) -> List[Dict[str, Any]]:
         return [t.to_dict() for t in self._tasks.values()]
@@ -300,6 +359,11 @@ class DetonationWorker:
                 
                 # Phase 1: Detonation in Docker (or Static Decomposition fallback)
                 task.status = "detonating"
+                try:
+                    db.update_task_status(task.task_id, status=task.status)
+                except Exception:
+                    pass
+
                 detonation_result = await asyncio.to_thread(
                     run_detonation,
                     sample_path=task.sample_meta["quarantine_path"],
@@ -309,6 +373,11 @@ class DetonationWorker:
                 
                 # Phase 2: Triage Extraction
                 task.status = "extracting_artifacts"
+                try:
+                    db.update_task_status(task.task_id, status=task.status)
+                except Exception:
+                    pass
+
                 triage_data = await asyncio.to_thread(
                     extract_triage_data,
                     output_dir=detonation_result["output_dir"]
@@ -316,6 +385,11 @@ class DetonationWorker:
                 
                 # Phase 3: AI Synthesis
                 task.status = "analyzing"
+                try:
+                    db.update_task_status(task.task_id, status=task.status)
+                except Exception:
+                    pass
+
                 synthesis = await asyncio.to_thread(
                     synthesize_threat_report,
                     sample_meta=task.sample_meta,
@@ -325,6 +399,11 @@ class DetonationWorker:
                 
                 # Phase 4: Report Generation
                 task.status = "generating_report"
+                try:
+                    db.update_task_status(task.task_id, status=task.status)
+                except Exception:
+                    pass
+
                 report_md = await asyncio.to_thread(
                     generate_threat_report,
                     sample_meta=task.sample_meta,
@@ -351,6 +430,17 @@ class DetonationWorker:
                 
                 task.status = "completed"
                 task.completed_at = datetime.now(timezone.utc).isoformat()
+                try:
+                    db.update_task_status(
+                        task.task_id,
+                        status="completed",
+                        completed_at=task.completed_at,
+                        report_path=task.report_path,
+                        report_data=task.report_data
+                    )
+                except Exception:
+                    pass
+
                 logger.info(f"[+] Task {task.task_id} finished successfully. Report generated at {task.report_path}")
 
             except Exception as e:
@@ -358,6 +448,16 @@ class DetonationWorker:
                 task.status = "failed"
                 task.error = str(e)
                 task.completed_at = datetime.now(timezone.utc).isoformat()
+                try:
+                    db.update_task_status(
+                        task.task_id,
+                        status="failed",
+                        error=task.error,
+                        completed_at=task.completed_at
+                    )
+                except Exception:
+                    pass
+
             finally:
                 self._queue.task_done()
 

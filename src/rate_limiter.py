@@ -1,31 +1,33 @@
 import logging
-import sqlite3
 from datetime import datetime, timezone
 from typing import Tuple, Optional
 
 import httpx
 
-from src.config import DATABASE_PATH, CLIENT_DAILY_QUOTA, TURNSTILE_SECRET_KEY
+import src.config as config
+from src.config import CLIENT_DAILY_QUOTA, TURNSTILE_SECRET_KEY
+from src.db import HunterDatabase, db
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+DATABASE_PATH = db.db_path
+
 
 def init_db():
-    """Initializes the SQLite rate-limiting table."""
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS client_quotas (
-                client_id TEXT NOT NULL,
-                date_utc TEXT NOT NULL,
-                detonation_count INTEGER DEFAULT 0,
-                PRIMARY KEY (client_id, date_utc)
-            )
-        """)
-        conn.commit()
+    """Initializes the database schema."""
+    global db
+    if Path(DATABASE_PATH) != db.db_path:
+        db = HunterDatabase(Path(DATABASE_PATH))
+    else:
+        db.init_db()
 
 
-# Initialize database on module load
-init_db()
+def _get_active_db() -> HunterDatabase:
+    global db
+    if Path(DATABASE_PATH) != db.db_path:
+        db = HunterDatabase(Path(DATABASE_PATH))
+    return db
 
 
 def get_today_utc() -> str:
@@ -46,18 +48,8 @@ def check_client_quota(client_id: str) -> Tuple[bool, int, int]:
     Returns (is_allowed, current_count, remaining_quota).
     """
     today = get_today_utc()
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT detonation_count FROM client_quotas WHERE client_id = ? AND date_utc = ?",
-            (client_id, today)
-        )
-        row = cursor.fetchone()
-        used = row[0] if row else 0
-
-    remaining = max(0, CLIENT_DAILY_QUOTA - used)
-    is_allowed = used < CLIENT_DAILY_QUOTA
-    return is_allowed, used, remaining
+    daily_limit = globals().get("CLIENT_DAILY_QUOTA", CLIENT_DAILY_QUOTA)
+    return _get_active_db().check_client_quota(client_id, today, daily_limit=daily_limit)
 
 
 def consume_client_quota(client_id: str) -> int:
@@ -66,20 +58,7 @@ def consume_client_quota(client_id: str) -> int:
     Returns the new used count.
     """
     today = get_today_utc()
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO client_quotas (client_id, date_utc, detonation_count)
-            VALUES (?, ?, 1)
-            ON CONFLICT(client_id, date_utc) DO UPDATE SET detonation_count = detonation_count + 1
-        """, (client_id, today))
-        conn.commit()
-
-        cursor.execute(
-            "SELECT detonation_count FROM client_quotas WHERE client_id = ? AND date_utc = ?",
-            (client_id, today)
-        )
-        return cursor.fetchone()[0]
+    return _get_active_db().consume_client_quota(client_id, today)
 
 
 def verify_turnstile_token(token: Optional[str], client_ip: str) -> bool:
