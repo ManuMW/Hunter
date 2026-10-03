@@ -591,6 +591,8 @@ function showDynamicProgressModal(hash) {
         statusModal.classList.add("active");
         document.body.style.overflow = "hidden";
     }
+}
+
 // Persistent Modal: Cloud Host Wake-up or Connection Timeout
 function showHostBootingModal(hash, errMessage) {
     const modalBackdrop = document.getElementById("reportModalBackdrop");
