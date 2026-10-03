@@ -319,6 +319,14 @@ def run_detonation(
                 except Exception as ex:
                     logger.warning(f"Could not compute static indicators for dynamic run: {ex}")
 
+            run_summary = {}
+            if summary_file.exists():
+                try:
+                    with open(summary_file, "r", encoding="utf-8") as f:
+                        run_summary = json.load(f)
+                except Exception:
+                    pass
+
             return {
                 "status": "completed" if res.returncode == 0 else "failed",
                 "execution_mode": "dynamic_sandbox",
