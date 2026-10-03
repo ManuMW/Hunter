@@ -27,6 +27,16 @@ document.addEventListener("DOMContentLoaded", () => {
     initReportSearch();
     initHashInput();
     renderReports();
+
+    try {
+        const pendingHash = localStorage.getItem("hunter_pending_hash");
+        if (pendingHash && /^[a-f0-9]{64}$/i.test(pendingHash)) {
+            const input = document.getElementById("quickHashInput");
+            if (input && !input.value) {
+                input.value = pendingHash;
+            }
+        }
+    } catch (e) {}
 });
 
 // Category and Severity filtering
@@ -359,13 +369,13 @@ async function ensureHostIsAwake(onStatusUpdate) {
     }
 
     const startTime = Date.now();
-    const timeoutMs = 60000;
+    const timeoutMs = 120000; // Extended to 120s to safely cover 65-75s cold VM boots
 
     while (Date.now() - startTime < timeoutMs) {
         await new Promise(r => setTimeout(r, 2500));
         const elapsed = Math.round((Date.now() - startTime) / 1000);
         if (onStatusUpdate) {
-            onStatusUpdate(`Initializing cloud sandbox & tunnels... (${elapsed}s)`);
+            onStatusUpdate(`Initializing cloud sandbox & secure tunnels... (${elapsed}s / 90s)`);
         }
 
         try {
@@ -375,6 +385,7 @@ async function ensureHostIsAwake(onStatusUpdate) {
             if (res.ok) {
                 const json = await res.json().catch(() => ({}));
                 if (json.status === "healthy") {
+                    if (onStatusUpdate) onStatusUpdate("Cloud sandbox ready! Submitting sample...");
                     return true;
                 }
             }
@@ -383,7 +394,7 @@ async function ensureHostIsAwake(onStatusUpdate) {
         }
     }
 
-    throw new Error("Cloud host took longer than expected to initialize. Please try again in a few seconds.");
+    throw new Error("Cloud host took longer than 120s to initialize. The VM is booting up—please click Retry.");
 }
 
 async function submitToDetonationApi(hash) {
@@ -395,6 +406,9 @@ async function submitToDetonationApi(hash) {
     }
 
     showDynamicProgressModal(hash);
+    try {
+        localStorage.setItem("hunter_pending_hash", hash);
+    } catch (e) {}
 
     try {
         const statusText = document.getElementById("statusHashDisplay");
@@ -435,6 +449,9 @@ async function submitToDetonationApi(hash) {
         }
 
         const data = await response.json();
+        try {
+            localStorage.removeItem("hunter_pending_hash");
+        } catch (e) {}
 
         // If report was already cached on server
         if (data.status === "cached" && data.report_url) {
@@ -453,7 +470,7 @@ async function submitToDetonationApi(hash) {
     } catch (err) {
         console.warn("Detonation API unreachable or error:", err);
         closeStatusModal();
-        showCloudQueueModal(hash, true, err.message);
+        showHostBootingModal(hash, err.message);
     } finally {
         if (btnAnalyze) {
             btnAnalyze.disabled = false;
@@ -572,6 +589,67 @@ function showDynamicProgressModal(hash) {
 
     if (statusModal) {
         statusModal.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+// Persistent Modal: Cloud Host Wake-up or Connection Timeout
+function showHostBootingModal(hash, errMessage) {
+    const modalBackdrop = document.getElementById("reportModalBackdrop");
+    const modalBadge = document.getElementById("modalBadge");
+    const modalContent = document.getElementById("modalContent");
+
+    if (modalBadge) {
+        modalBadge.textContent = "SANDBOX INITIALIZING";
+        modalBadge.style.background = "#faad14";
+        modalBadge.style.color = "#000000";
+    }
+
+    modalContent.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <div style="width: 42px; height: 42px; border-radius: 50%; background: rgba(250, 173, 20, 0.12); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                ⚡
+            </div>
+            <div>
+                <h1 class="report-headline" style="margin: 0; font-size: 20px;">Cloud Sandbox Booting</h1>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-muted);">Instance Waking from Standby</p>
+            </div>
+        </div>
+
+        <div class="report-meta-grid" style="margin: 20px 0;">
+            <div>
+                <span class="meta-field-label">SUBMITTED SHA-256</span>
+                <span class="meta-field-value" style="font-family: monospace; font-size: 11px;">${escapeHtml(hash)}</span>
+            </div>
+            <div>
+                <span class="meta-field-label">SANDBOX STATUS</span>
+                <span class="meta-field-value" style="color: #faad14; font-weight: 700;">INITIALIZING</span>
+            </div>
+            <div>
+                <span class="meta-field-label">ACTION</span>
+                <span class="meta-field-value" style="color: var(--elastic-teal); font-weight: 700;">CLICK RETRY</span>
+            </div>
+        </div>
+
+        <p class="report-para" style="margin-bottom: 16px;">
+            The Cloud Detonation Sandbox was in power-saving standby and received the wake-up signal. 
+            Because the host initializes isolated virtualization runtimes and secure tunnels, startup took slightly longer than the initial connection window.
+        </p>
+
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6; color: var(--text-body);">
+            ${errMessage ? escapeHtml(errMessage) : "Instance boot in progress. The environment is coming online now."}
+        </div>
+
+        <p class="report-para" style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">
+            The server should now be warm. Click <strong>Retry Submission</strong> to send your sample for detonation immediately.
+        </p>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn-clear" onclick="closeReportModal()">Cancel</button>
+            <button class="btn-submit" onclick="closeReportModal(); submitToDetonationApi('${escapeHtml(hash)}')">Retry Submission</button>
+        </div>
+    `;
+
+    if (modalBackdrop) {
+        modalBackdrop.classList.add("active");
         document.body.style.overflow = "hidden";
     }
 }
