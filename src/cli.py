@@ -77,6 +77,16 @@ def cmd_submit_hash(args):
 
     # 5. Quarantine
     sample_meta = quarantine_sample(raw_binary, sample_info["filename"])
+    sample_meta["signature"] = sample_info.get("signature") or "Unclassified"
+    sample_meta["tags"] = sample_info.get("tags") or []
+    sample_meta["first_seen"] = sample_info.get("first_seen")
+    sample_meta["vendor_intel"] = {
+        "malwarebazaar": {
+            "signature": sample_info.get("signature"),
+            "tags": sample_info.get("tags"),
+            "first_seen": sample_info.get("first_seen")
+        }
+    }
     print(f"[+] Sample stored in Quarantine Store: {sample_meta['quarantine_path']}")
 
     # 6. Detonate

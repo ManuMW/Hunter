@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from src.config import SANDBOX_IMAGE, DETONATION_TIMEOUT, ARTIFACTS_DIR
+from src.static_analyzer import perform_full_static_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +143,15 @@ def run_static_analysis(
             logger.warning(f"Could not read sample from {sample_path}: {e}")
             raw_bytes = b""
 
+    static_res = perform_full_static_analysis(sample_path=sample_path, raw_bytes=raw_bytes)
+    elf_decomp = static_res.get("elf_decomposition", {})
     elf_info = parse_elf_header(raw_bytes)
-    indicators = extract_binary_indicators(raw_bytes)
+    # Merge rich decomposition into elf_info
+    if elf_decomp.get("is_elf"):
+        elf_info.update(elf_decomp)
+
+    indicators = static_res.get("plain_indicators", {})
+    xor_decomp = static_res.get("xor_deobfuscation", {})
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     native_dir = output_dir / "native"
@@ -155,7 +163,12 @@ def run_static_analysis(
         json.dump({
             "elf_info": elf_info,
             "indicators": indicators,
-            "file_size": len(raw_bytes),
+            "sample_strings": static_res.get("sample_plain_strings", []),
+            "total_strings": static_res.get("total_plain_strings", 0),
+            "entropy": static_res.get("overall_entropy", 0.0),
+            "is_high_entropy": static_res.get("is_high_entropy", False),
+            "xor_deobfuscation": xor_decomp,
+            "file_size": static_res.get("file_size", len(raw_bytes)),
             "sha256": sha256
         }, f, indent=2)
 
@@ -164,21 +177,26 @@ def run_static_analysis(
     with open(log_file, "w", encoding="utf-8") as f:
         f.write(f"[*] Static Binary Decomposition executed at {timestamp}\n")
         f.write(f"[*] Sample Size: {len(raw_bytes)} bytes\n")
-        f.write(f"[*] File Format: {elf_info.get('format', 'Unknown')} ({elf_info.get('architecture', 'N/A')})\n")
-        f.write(f"[*] Extracted Discovered IPs: {', '.join(indicators['ips']) or 'None'}\n")
-        f.write(f"[*] Extracted Discovered URLs: {', '.join(indicators['urls']) or 'None'}\n")
-        f.write(f"[*] Discovered Keywords: {indicators['keywords']}\n")
-        f.write("[*] Dynamic container detonation scheduled for Cloud Detonation Host.\n")
+        f.write(f"[*] File Format: {elf_info.get('format', 'Unknown')} ({elf_info.get('architecture', elf_info.get('machine', 'N/A'))})\n")
+        f.write(f"[*] Shannon Entropy: {static_res.get('overall_entropy', 0.0)}\n")
+        f.write(f"[*] Extracted Discovered IPs: {', '.join(indicators.get('ips', [])) or 'None'}\n")
+        f.write(f"[*] Extracted Discovered URLs: {', '.join(indicators.get('urls', [])) or 'None'}\n")
+        f.write(f"[*] Discovered Keywords: {indicators.get('keywords', [])}\n")
+        if xor_decomp.get("is_xor_obfuscated"):
+            keys = [k["key_hex"] for k in xor_decomp.get("detected_keys", [])]
+            f.write(f"[*] Obfuscated Strings Identified (XOR Keys: {', '.join(keys)})\n")
+        f.write("[*] Automated static binary decomposition and forensic analysis completed.\n")
 
     summary = {
         "start_time": timestamp,
         "execution_mode": "static_binary_analysis",
         "sample_type": elf_info.get("format", "Linux Binary"),
-        "architecture": elf_info.get("architecture", "Unknown"),
+        "architecture": elf_info.get("architecture", elf_info.get("machine", "Unknown")),
         "file_size": len(raw_bytes),
+        "entropy": static_res.get("overall_entropy", 0.0),
         "status": "completed",
-        "cloud_detonation_pending": True,
-        "note": "Genuine static binary reverse engineering completed. Dynamic container run delegated to Cloud Detonation Host."
+        "cloud_detonation_pending": False,
+        "note": "Genuine static binary reverse engineering and string deobfuscation completed."
     }
 
     summary_file = output_dir / "run_summary.json"
@@ -193,7 +211,7 @@ def run_static_analysis(
         f.write("# Static triage mode: No container dropped files recorded.\n")
 
     # If static analysis found cron paths, note them genuinely
-    cron_paths = [p for p in indicators["paths"] if "cron" in p]
+    cron_paths = [p for p in indicators.get("paths", []) if "cron" in p]
     with open(native_dir / "crontabs.txt", "w", encoding="utf-8") as f:
         if cron_paths:
             for cp in cron_paths:
@@ -274,13 +292,32 @@ def run_detonation(
             summary_file = run_output_dir / "run_summary.json"
             artifacts_zip = run_output_dir / "artifacts.zip"
 
-            run_summary = {}
-            if summary_file.exists():
+            # Ensure static indicators and deobfuscation are captured alongside dynamic artifacts
+            native_dir = run_output_dir / "native"
+            native_dir.mkdir(parents=True, exist_ok=True)
+            static_file = native_dir / "static_indicators.json"
+            if not static_file.exists():
                 try:
-                    with open(summary_file, "r", encoding="utf-8") as f:
-                        run_summary = json.load(f)
-                except Exception:
-                    pass
+                    sample_bytes = raw_bytes if raw_bytes is not None else Path(sample_path).read_bytes()
+                    static_res = perform_full_static_analysis(sample_path=sample_path, raw_bytes=sample_bytes)
+                    elf_decomp = static_res.get("elf_decomposition", {})
+                    elf_info = parse_elf_header(sample_bytes)
+                    if elf_decomp.get("is_elf"):
+                        elf_info.update(elf_decomp)
+                    with open(static_file, "w", encoding="utf-8") as f:
+                        json.dump({
+                            "elf_info": elf_info,
+                            "indicators": static_res.get("plain_indicators", {}),
+                            "sample_strings": static_res.get("sample_plain_strings", []),
+                            "total_strings": static_res.get("total_plain_strings", 0),
+                            "entropy": static_res.get("overall_entropy", 0.0),
+                            "is_high_entropy": static_res.get("is_high_entropy", False),
+                            "xor_deobfuscation": static_res.get("xor_deobfuscation", {}),
+                            "file_size": static_res.get("file_size", len(sample_bytes)),
+                            "sha256": sha256
+                        }, f, indent=2)
+                except Exception as ex:
+                    logger.warning(f"Could not compute static indicators for dynamic run: {ex}")
 
             return {
                 "status": "completed" if res.returncode == 0 else "failed",

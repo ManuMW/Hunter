@@ -171,6 +171,14 @@ def extract_triage_data(output_dir: str) -> Dict[str, Any]:
                 for url in ind.get("urls", []):
                     if url not in network_indicators:
                         network_indicators.append(url)
+                # Also include XOR deobfuscated network indicators
+                xor_info = static_indicators.get("xor_deobfuscation", {})
+                for ip in xor_info.get("deobfuscated_ips", []):
+                    if ip not in network_indicators:
+                        network_indicators.append(ip)
+                for url in xor_info.get("deobfuscated_urls", []):
+                    if url not in network_indicators:
+                        network_indicators.append(url)
             except Exception as se:
                 logger.debug(f"Could not parse static_indicators.json: {se}")
 

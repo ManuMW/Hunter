@@ -77,13 +77,60 @@ def generate_threat_report(
         f"| **File Size** | `{sample_meta.get('size_bytes')} bytes` |",
         f"| **SHA-256** | `{sha256}` |",
         f"| **SHA-1** | `{sample_meta.get('sha1')}` |",
-        f"| **MD5** | `{sample_meta.get('md5')}` |",
+        f"| **MD5** | `{sample_meta.get('md5')}` |"
+    ]
+
+    # Include MalwareBazaar signature and tags if available
+    if sample_meta.get("signature") and sample_meta.get("signature") != "Unclassified":
+        report_lines.append(f"| **Vendor Signature** | `{sample_meta.get('signature')}` |")
+    if sample_meta.get("tags"):
+        report_lines.append(f"| **Threat Tags** | `{', '.join(sample_meta.get('tags'))}` |")
+
+    # Static ELF decomposition details
+    static_data = triage_data.get("static_indicators", {})
+    elf_info = static_data.get("elf_info", {})
+    if elf_info.get("is_elf"):
+        arch = elf_info.get("architecture") or elf_info.get("machine") or "Unknown"
+        report_lines.append(f"| **ELF Architecture** | `{arch}` |")
+        report_lines.append(f"| **ELF Class / Endianness** | `{elf_info.get('class', 'N/A')} / {elf_info.get('endianness', 'N/A')}` |")
+        if static_data.get("entropy") is not None:
+            report_lines.append(f"| **Shannon Entropy** | `{static_data.get('entropy')}` |")
+
+    # Security Mitigations sub-table
+    mitigations = elf_info.get("security_mitigations", {})
+    if mitigations:
+        report_lines.extend([
+            "",
+            "### Binary Hardening & Exploit Mitigations",
+            "",
+            "| Mitigation | Security Status |",
+            "| :--- | :--- |",
+            f"| **Stack Canary** | `{mitigations.get('canary', 'Not Checked')}` |",
+            f"| **NX / DEP (No-Execute)** | `{mitigations.get('nx', 'Not Checked')}` |",
+            f"| **Position Independent Executable (PIE)** | `{mitigations.get('pie', 'Not Checked')}` |",
+            f"| **Relocation Read-Only (RelRO)** | `{mitigations.get('relro', 'Not Checked')}` |",
+            f"| **Symbol Table** | `{mitigations.get('stripped', 'Not Checked')}` |"
+        ])
+
+    # XOR Deobfuscation Findings
+    xor_decomp = static_data.get("xor_deobfuscation", {})
+    if xor_decomp.get("is_xor_obfuscated"):
+        keys_list = [k.get("key_hex", "") for k in xor_decomp.get("detected_keys", [])]
+        report_lines.extend([
+            "",
+            "### Cryptographic Obfuscation Triage",
+            "",
+            f"> [!IMPORTANT]",
+            f"> Static deobfuscation detected single-byte XOR string encoding utilizing key(s): **{', '.join(keys_list)}**."
+        ])
+
+    report_lines.extend([
         "",
         "## 3. MITRE ATT&CK Mapping",
         "",
         "| Technique ID | Technique Name | Tactic | Observed Forensic Evidence |",
         "| :--- | :--- | :--- | :--- |"
-    ]
+    ])
 
     if synthesis.mitre_attack_techniques:
         for m in synthesis.mitre_attack_techniques:
@@ -121,12 +168,14 @@ def generate_threat_report(
     else:
         report_lines.append(f"| `sha256` | `{sha256}` | Primary Sample SHA-256 |")
 
-    # Dropped Payloads Decomposition Section
+    # Dropped Payloads Decomposition Section (HUN-27: Section 6 always present)
+    report_lines.extend([
+        "",
+        "## 6. Dropped Payloads & Multi-Stage Attack Decomposition",
+        ""
+    ])
     if synthesis.dropped_payload_analyses:
         report_lines.extend([
-            "",
-            "## 6. Dropped Payloads & Multi-Stage Attack Decomposition",
-            "",
             "> [!NOTE]",
             "> All executable sub-payloads staged during execution have been quarantined on the Detonation Host and are available for standalone detonation.",
             "",
@@ -149,6 +198,11 @@ def generate_threat_report(
             if p.embedded_indicators:
                 report_lines.append(f"- **Extracted Indicators / Configs**: {', '.join(f'`{defang_ioc(i)}`' for i in p.embedded_indicators)}")
             report_lines.append("")
+    else:
+        report_lines.extend([
+            "No secondary dropped payloads or staged execution stages were identified during binary decomposition.",
+            ""
+        ])
 
     # Add forensic dump section
     report_lines.extend([

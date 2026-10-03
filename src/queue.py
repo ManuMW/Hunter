@@ -125,7 +125,8 @@ def synthesis_to_report_dict(
     sha256: str,
     filename: str,
     synthesis: Dict[str, Any],
-    triage_data: Optional[Dict[str, Any]] = None
+    triage_data: Optional[Dict[str, Any]] = None,
+    sample_meta: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     score = synthesis.get("threat_severity_score", 7)
     classification = synthesis.get("threat_classification", "MALWARE").upper()
@@ -156,6 +157,13 @@ def synthesis_to_report_dict(
         for b in synthesis.get("observed_behaviors", []):
             process_tree.append(f"{b.get('category', 'Behavior')}: {b.get('evidence', '')}")
 
+    report_tags = [classification, family.upper(), f"SEVERITY_{score}"]
+    if sample_meta and sample_meta.get("tags"):
+        for t in sample_meta["tags"]:
+            tag_upper = str(t).upper()
+            if tag_upper not in report_tags:
+                report_tags.append(tag_upper)
+
     return {
         "id": sha256,
         "sha256": sha256,
@@ -168,7 +176,7 @@ def synthesis_to_report_dict(
         "author": "Hunter Research Team",
         "readTime": "4 min read",
         "summary": synthesis.get("executive_summary", ""),
-        "tags": [classification, family.upper(), f"SEVERITY_{score}"],
+        "tags": report_tags,
         "mitre": mitre_list,
         "iocs": ioc_list,
         "behavior": {
@@ -433,7 +441,8 @@ class DetonationWorker:
                     sha256=task.sha256,
                     filename=task.sample_meta.get("filename", "sample"),
                     synthesis=task.synthesis,
-                    triage_data=triage_data
+                    triage_data=triage_data,
+                    sample_meta=task.sample_meta
                 )
                 task.report_data = report_dict
                 append_to_catalog(report_dict)

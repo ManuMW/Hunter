@@ -197,6 +197,16 @@ async def submit_hash(
 
     # Step 8: Store in Quarantine and Enqueue Detonation
     sample_meta = quarantine_sample(raw_binary, sample_info["filename"])
+    sample_meta["signature"] = sample_info.get("signature") or "Unclassified"
+    sample_meta["tags"] = sample_info.get("tags") or []
+    sample_meta["first_seen"] = sample_info.get("first_seen")
+    sample_meta["vendor_intel"] = {
+        "malwarebazaar": {
+            "signature": sample_info.get("signature"),
+            "tags": sample_info.get("tags"),
+            "first_seen": sample_info.get("first_seen")
+        }
+    }
     task = worker.submit_sample(sample_meta)
 
     # Step 9: Consume 1 quota point
@@ -244,7 +254,8 @@ def _resolve_report_dict(sha256: str) -> Optional[Dict[str, Any]]:
         return synthesis_to_report_dict(
             sha256=sha256,
             filename=task.sample_meta.get("filename", "sample"),
-            synthesis=task.synthesis
+            synthesis=task.synthesis,
+            sample_meta=task.sample_meta
         )
 
     # Check data/reports.js
