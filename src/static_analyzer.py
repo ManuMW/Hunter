@@ -86,15 +86,19 @@ def find_indicators_in_text(text: str) -> Dict[str, List[str]]:
     path_pattern = re.compile(r"/(?:tmp|etc|var|proc|sys|dev|bin|usr|sbin)/[a-zA-Z0-9_\-\./]+")
     paths = list(set(path_pattern.findall(text)))
 
-    # Keywords
+    # Keywords with frequency counts
     text_lower = text.lower()
-    matched_keywords = [kw for kw in SUSPICIOUS_KEYWORDS if kw.lower() in text_lower]
+    keyword_counts = {}
+    for kw in SUSPICIOUS_KEYWORDS:
+        c = text_lower.count(kw.lower())
+        if c > 0:
+            keyword_counts[kw] = c
 
     return {
         "ips": valid_ips[:20],
         "urls": urls[:20],
         "paths": paths[:30],
-        "keywords": matched_keywords
+        "keywords": keyword_counts
     }
 
 
@@ -110,7 +114,8 @@ def brute_force_xor_strings(
     if plain_indicators is None:
         plain_text = " ".join(extract_plain_strings(data[:max_scan_bytes]))
         plain_dict = find_indicators_in_text(plain_text)
-        plain_indicators = set(plain_dict["ips"] + plain_dict["urls"] + plain_dict["keywords"])
+        kw_set = list(plain_dict["keywords"].keys()) if isinstance(plain_dict["keywords"], dict) else plain_dict["keywords"]
+        plain_indicators = set(plain_dict["ips"] + plain_dict["urls"] + kw_set)
 
     scan_chunk = data[:max_scan_bytes]
     discovered = []
@@ -124,7 +129,8 @@ def brute_force_xor_strings(
         dec_text = " ".join(dec_strings)
 
         ind = find_indicators_in_text(dec_text)
-        new_keywords = [k for k in ind["keywords"] if k not in plain_indicators]
+        ind_kws = list(ind["keywords"].keys()) if isinstance(ind["keywords"], dict) else ind["keywords"]
+        new_keywords = [k for k in ind_kws if k not in plain_indicators]
         new_ips = [ip for ip in ind["ips"] if ip not in plain_indicators]
         new_urls = [u for u in ind["urls"] if u not in plain_indicators]
 
@@ -333,7 +339,8 @@ def perform_full_static_analysis(
     plain_strings = extract_plain_strings(raw_bytes, min_len=4)
     plain_text = " ".join(plain_strings[:20000])
     plain_indicators = find_indicators_in_text(plain_text)
-    known_plain_set = set(plain_indicators["ips"] + plain_indicators["urls"] + plain_indicators["keywords"])
+    kw_keys = list(plain_indicators["keywords"].keys()) if isinstance(plain_indicators["keywords"], dict) else plain_indicators["keywords"]
+    known_plain_set = set(plain_indicators["ips"] + plain_indicators["urls"] + kw_keys)
 
     # 3. Obfuscated / XOR String Brute-Force Extraction
     xor_findings = brute_force_xor_strings(raw_bytes, plain_indicators=known_plain_set)

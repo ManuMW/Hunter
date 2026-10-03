@@ -249,7 +249,13 @@ def _deterministic_fallback_synthesis(
     persistence = triage_data.get("persistence_hooks", [])
     static_data = triage_data.get("static_indicators", {})
     indicators = static_data.get("indicators", {})
-    keywords = indicators.get("keywords", {})
+    raw_keywords = indicators.get("keywords", {})
+    if isinstance(raw_keywords, list):
+        keywords = {k: 1 for k in raw_keywords}
+    elif isinstance(raw_keywords, dict):
+        keywords = raw_keywords
+    else:
+        keywords = {}
     ips = indicators.get("ips", [])
     urls = indicators.get("urls", [])
     paths = indicators.get("paths", [])
