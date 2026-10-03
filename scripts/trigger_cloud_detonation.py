@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-remote_cmd = "cd /home/manumw21/Hunter && git pull origin main && git log -n 1 --oneline && sudo systemctl restart hunter-detonation"
+remote_cmd = "sqlite3 /home/manumw21/Hunter/data/hunter.db 'SELECT * FROM client_quotas;'"
 
 cmd = [
     "gcloud", "compute", "ssh", "manumw21@velociraptor",

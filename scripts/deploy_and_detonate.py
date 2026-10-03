@@ -32,7 +32,7 @@ def start_vm():
                 time.sleep(10)
                 break
 
-def run_ssh(remote_cmd, timeout=120):
+def run_ssh(remote_cmd, timeout=120, max_retries=3):
     cmd = [
         "gcloud", "compute", "ssh", "manumw21@velociraptor",
         "--zone=asia-south1-b",
@@ -42,13 +42,15 @@ def run_ssh(remote_cmd, timeout=120):
         "--", "-batch"
     ]
     print(f"[*] Executing on VM: {remote_cmd}")
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=True)
-    if res.returncode != 0:
-        print(f"[-] Command failed with code {res.returncode}")
-        print("STDOUT:", res.stdout)
-        print("STDERR:", res.stderr)
-    else:
-        print("[+] Output:\n", res.stdout)
+    for attempt in range(max_retries):
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=True)
+        if res.returncode == 0:
+            print("[+] Output:\n", res.stdout)
+            return res
+        print(f"[-] Attempt {attempt+1}/{max_retries} failed with code {res.returncode}. Retrying in 5s...")
+        time.sleep(5)
+    print("STDOUT:", res.stdout)
+    print("STDERR:", res.stderr)
     return res
 
 def main():
@@ -71,9 +73,11 @@ def main():
     time.sleep(5)
 
     print(f"[3/5] Submitting hash {TARGET_HASH} to detonation API...")
+    admin_client_id = f"admin-runner-{int(time.time())}"
     submit_cmd = (
         f"curl -s -X POST http://127.0.0.1:8888/api/submit-hash "
         f"-H 'Content-Type: application/json' "
+        f"-H 'X-Client-Id: {admin_client_id}' "
         f"-d '{{\"sha256\": \"{TARGET_HASH}\"}}'"
     )
     res = run_ssh(submit_cmd)
@@ -84,6 +88,10 @@ def main():
         print(f"[+] Task ID: {task_id}, Status: {data.get('status')}")
     except Exception as e:
         print(f"[-] Could not parse JSON response: {e}")
+
+    if not task_id:
+        print(f"[-] Submission failed: {res.stdout.strip()}")
+        return
 
     print("[4/5] Polling task status...")
     for i in range(35):
