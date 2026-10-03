@@ -5,6 +5,159 @@
 
 const THREAT_REPORTS = [
     {
+        "id": "4323be148265ba895f7dd1054cd8522890288d855225ea80dcb47161ea43ca8f",
+        "sha256": "4323be148265ba895f7dd1054cd8522890288d855225ea80dcb47161ea43ca8f",
+        "title": "Threat Analysis Report: arm7 (Mirai Botnet)",
+        "family": "Mirai Botnet",
+        "category": "BOTNET",
+        "severity": "CRITICAL",
+        "severityScore": "8/10",
+        "date": "2026-10-03",
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": "Static binary analysis and reverse engineering triage was conducted on sample 'arm7' (Linux ELF Binary, 259796 bytes). The sample is classified as Mirai Botnet (Botnet) with an assessed threat severity score of 8/10. Static and deobfuscated indicator extraction revealed 24 external IP endpoints and 1 target URLs. Observed behavioral signatures include 27 SSH authentication markers and 0 automated scanning routines characteristic of distributed denial-of-service botnets. Cryptographic deobfuscation successfully recovered concealed botnet command strings across 2 XOR key(s). Forensic telemetry and binary structural decomposition have been cataloged for defensive detection and threat hunting.",
+        "tags": [
+            "BOTNET",
+            "MIRAI BOTNET",
+            "SEVERITY_8",
+            "ELF",
+            "MIRAI"
+        ],
+        "mitre": [
+            {
+                "id": "T1498",
+                "name": "Network Denial of Service",
+                "tactic": "Impact"
+            },
+            {
+                "id": "T1046",
+                "name": "Network Service Discovery",
+                "tactic": "Discovery"
+            },
+            {
+                "id": "T1110",
+                "name": "Brute Force",
+                "tactic": "Credential Access"
+            },
+            {
+                "id": "T1027",
+                "name": "Obfuscated Files or Information",
+                "tactic": "Defense Evasion"
+            },
+            {
+                "id": "T1059.004",
+                "name": "Command and Scripting Interpreter: Unix Shell",
+                "tactic": "Execution"
+            },
+            {
+                "id": "T1071",
+                "name": "Application Layer Protocol",
+                "tactic": "Command and Control"
+            }
+        ],
+        "iocs": [
+            {
+                "type": "sha256",
+                "value": "4323be148265ba895f7dd1054cd8522890288d855225ea80dcb47161ea43ca8f",
+                "description": "Primary sample SHA-256"
+            },
+            {
+                "type": "md5",
+                "value": "267d910fd4bbcffd8ca15b9e5bddb920",
+                "description": "Primary sample MD5"
+            },
+            {
+                "type": "ip",
+                "value": "95.25.12.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "137.83.124.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "31.215.128.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "78.106.228.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "31.172.207.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "84.94.64.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "152.200.236.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "90.118.128.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "147.10.235.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "ip",
+                "value": "89.217.134.0",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "url",
+                "value": "http://176.65.139.196/bins/kla.sh",
+                "description": "Discovered URL indicator"
+            },
+            {
+                "type": "file_path",
+                "value": "/sys/devices/system/cpu",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/dev/misc/watchdog",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/proc/cpuinfo",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/proc/stat",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/dev/urandom",
+                "description": "Discovered filesystem path"
+            }
+        ],
+        "behavior": {
+            "processTree": [
+                "Discovery: Identified 27 SSH references and 0 scan routines.",
+                "Command and Control: Discovered IP endpoints: 95.25.12.0, 137.83.124.0, 31.215.128.0, 78.106.228.0",
+                "Defense Evasion: Extracted 2 XOR key(s): 0x2e, 0xd1"
+            ],
+            "droppedPayloads": []
+        },
+        "yaraRule": "rule Linux_Mirai_Botnet_4323be14 {\n    meta:\n        description = \"Detection rule for Mirai Botnet (Botnet) - 4323be148265ba895f7dd1054cd8522890288d855225ea80dcb47161ea43ca8f\"\n        author = \"Hunter Threat Research Team\"\n        date = \"2026-10-03\"\n        hash = \"4323be148265ba895f7dd1054cd8522890288d855225ea80dcb47161ea43ca8f\"\n        malware_family = \"Mirai Botnet\"\n        severity = \"8/10\"\n    strings:\n        $s1 = \"Qkbh///.........,.\" ascii\n        $s2 = \"./...\" ascii\n        $s3 = \"-.,..*\" ascii\n        $s4 = \".0.5./..^\" ascii\n        $s5 = \"/..*...*.../........\" ascii\n        $s6 = \"..B^,.B^,.+....\" ascii\n    condition:\n        uint32(0) == 0x464c457f and\n        filesize >= 155877 and filesize <= 417721 and\n        2 of ($s*)\n}"
+    },
+    {
         "id": "08ff1a293519f919c4fce850a6794a4df1f1b12e4aa3d6a29ee2ae30ff948278",
         "sha256": "08ff1a293519f919c4fce850a6794a4df1f1b12e4aa3d6a29ee2ae30ff948278",
         "title": "Threat Analysis Report: arm5 (Mirai Botnet)",
