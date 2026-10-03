@@ -188,34 +188,36 @@ def synthesis_to_report_dict(
 
 
 def append_to_catalog(report_dict: Dict[str, Any]):
-    """Appends newly detonated report to data/reports.js."""
+    """Appends newly detonated report to data/reports.js (or updates existing entry)."""
     for file_path in [Path("data/reports.js")]:
         if not file_path.exists():
             continue
         try:
             content = file_path.read_text(encoding="utf-8")
             clean_sha = report_dict["sha256"].lower().strip()
-            if clean_sha in content.lower():
-                continue
 
             start_idx = content.find("[")
             end_idx = content.rfind("]")
+            reports = []
             if start_idx != -1 and end_idx != -1:
                 raw = content[start_idx:end_idx + 1]
                 try:
                     reports = json.loads(raw)
                 except Exception:
                     reports = []
-                reports.insert(0, report_dict)
-                header = (
-                    "/**\n"
-                    " * Hunter Security Labs - Cataloged Threat Intelligence Reports\n"
-                    " * Generated from live detonation runs in Hunter\n"
-                    " */\n\n"
-                    "const THREAT_REPORTS = "
-                )
-                file_path.write_text(f"{header}{json.dumps(reports, indent=4)};\n", encoding="utf-8")
-                logger.info(f"[+] Appended report {clean_sha} to {file_path}")
+
+            # Remove existing entry if present
+            reports = [r for r in reports if (r.get("sha256") or r.get("id") or "").lower() != clean_sha]
+            reports.insert(0, report_dict)
+            header = (
+                "/**\n"
+                " * Hunter Security Labs - Cataloged Threat Intelligence Reports\n"
+                " * Generated from live detonation runs in Hunter\n"
+                " */\n\n"
+                "const THREAT_REPORTS = "
+            )
+            file_path.write_text(f"{header}{json.dumps(reports, indent=4)};\n", encoding="utf-8")
+            logger.info(f"[+] Updated report {clean_sha} in {file_path}")
         except Exception as e:
             logger.warning(f"Failed to append report to {file_path}: {e}")
 

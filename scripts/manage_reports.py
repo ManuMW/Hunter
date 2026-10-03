@@ -112,6 +112,17 @@ def parse_frontmatter(md_path: Path) -> Dict[str, Any]:
     if family_match:
         meta["family"] = family_match.group(1).strip().strip('"\'')
 
+    classification_match = re.search(r"^classification:\s*(.+)$", content, re.MULTILINE)
+    if classification_match:
+        meta["category"] = classification_match.group(1).strip().strip('"\'').upper()
+
+    score_match = re.search(r"^severity_score:\s*(\d+)", content, re.MULTILINE)
+    if score_match:
+        score = int(score_match.group(1))
+        meta["severity_score"] = score
+        meta["severityScore"] = f"{score}/10"
+        meta["severity"] = "CRITICAL" if score >= 8 else "HIGH" if score >= 6 else "MEDIUM"
+
     date_match = re.search(r"^date:\s*(.+)$", content, re.MULTILINE)
     if date_match:
         meta["date"] = date_match.group(1).strip().strip('"\'')
@@ -120,7 +131,14 @@ def parse_frontmatter(md_path: Path) -> Dict[str, Any]:
     if author_match:
         meta["author"] = author_match.group(1).strip().strip('"\'')
 
-    sha_match = re.search(r"Primary SHA256:\s*`([a-f0-9]{64})`", content, re.IGNORECASE)
+    # Executive Summary extraction
+    summary_match = re.search(r"## 1\. Executive Summary\s*\n\s*(.+?)(?=\n## |\Z)", content, re.DOTALL)
+    if summary_match:
+        meta["summary"] = summary_match.group(1).strip()
+
+    sha_match = re.search(r"^sha256:\s*([a-f0-9]{64})", content, re.MULTILINE | re.IGNORECASE)
+    if not sha_match:
+        sha_match = re.search(r"Primary SHA256:\s*`([a-f0-9]{64})`", content, re.IGNORECASE)
     if sha_match:
         meta["sha256"] = sha_match.group(1).lower()
     else:
@@ -224,7 +242,7 @@ def delete_report(
 
     success = removed_from_catalog or file_deleted or (db_deleted > 0)
     if success:
-        print(f"[✓] Successfully purged threat report for {clean_sha}")
+        print(f"[+] Successfully purged threat report for {clean_sha}")
     else:
         print(f"[!] No artifacts found for {clean_sha}")
     return success
@@ -338,14 +356,14 @@ def restore_report(
         save_catalog(current_catalog, catalog_path)
         print(f"[+] Re-indexed {clean_sha[:16]}... in {catalog_path.name}")
 
-    print(f"[✓] Successfully restored report for {clean_sha}")
+    print(f"[+] Successfully restored report for {clean_sha}")
     return True
 
 
 def rebuild_catalog(reports_dir: Path = REPORTS_DIR, catalog_path: Path = CATALOG_PATH) -> int:
     """
     Rebuilds catalog from existing markdown files.
-    Preserves existing metadata if present, and extracts frontmatter for new files.
+    Preserves existing metadata if present, updating frontmatter fields, and extracts frontmatter for new files.
     """
     existing_catalog = {
         (r.get("sha256") or r.get("id") or "").lower(): r
@@ -358,28 +376,44 @@ def rebuild_catalog(reports_dir: Path = REPORTS_DIR, catalog_path: Path = CATALO
 
     for md in md_files:
         sha = md.stem.lower()
+        meta = parse_frontmatter(md)
         if sha in existing_catalog:
-            rebuilt_list.append(existing_catalog[sha])
+            entry = dict(existing_catalog[sha])
+            if "title" in meta:
+                entry["title"] = meta["title"]
+            if "family" in meta:
+                entry["family"] = meta["family"]
+            if "category" in meta:
+                entry["category"] = meta["category"]
+            if "severity" in meta:
+                entry["severity"] = meta["severity"]
+            if "severityScore" in meta:
+                entry["severityScore"] = meta["severityScore"]
+            if "summary" in meta:
+                entry["summary"] = meta["summary"]
+            if "date" in meta:
+                entry["date"] = meta["date"]
+            rebuilt_list.append(entry)
         else:
-            meta = parse_frontmatter(md)
             rebuilt_list.append({
                 "id": sha,
                 "sha256": sha,
                 "title": meta.get("title", f"Threat Analysis Report: {sha[:12]}"),
                 "family": meta.get("family", "Unknown"),
-                "category": "BENIGN",
-                "severity": "MEDIUM",
+                "category": meta.get("category", "BENIGN"),
+                "severity": meta.get("severity", "MEDIUM"),
+                "severityScore": meta.get("severityScore", "5/10"),
                 "date": meta.get("date", "2026-10-02"),
                 "author": meta.get("author", "Hunter Research Team"),
                 "readTime": "4 min read",
-                "summary": "Rebuilt threat report catalog entry.",
+                "summary": meta.get("summary", "Rebuilt threat report catalog entry."),
                 "tags": [meta.get("family", "UNKNOWN").upper()],
                 "mitre": [],
                 "iocs": [{"type": "sha256", "value": sha, "description": "Primary SHA-256"}]
             })
 
     save_catalog(rebuilt_list, catalog_path)
-    print(f"[✓] Rebuilt catalog with {len(rebuilt_list)} report(s).")
+    print(f"[+] Rebuilt catalog with {len(rebuilt_list)} report(s).")
     return len(rebuilt_list)
 
 
@@ -395,7 +429,7 @@ def sync_git(message: str = "chore(reports): synchronize catalog and prune delet
         subprocess.run(["git", "commit", "-m", message], cwd=REPO_ROOT, check=True)
         print(f"[+] Committed changes: {message}")
         subprocess.run(["git", "push", "origin", "main"], cwd=REPO_ROOT, check=True)
-        print("[✓] Pushed updates to origin/main. GitHub Pages deployment triggered.")
+        print("[+] Pushed updates to origin/main. GitHub Pages deployment triggered.")
         return True
     except subprocess.CalledProcessError as e:
         print(f"[!] Git sync failed: {e}")
