@@ -5,6 +5,60 @@
 
 const THREAT_REPORTS = [
     {
+        "id": "a9795082ddfb5f57e9068a7ca4ac4f1d2efcb7d2a45f40563d87c1ab786560b5",
+        "sha256": "a9795082ddfb5f57e9068a7ca4ac4f1d2efcb7d2a45f40563d87c1ab786560b5",
+        "title": "Threat Analysis Report: a9795082ddfb5f57.bin (Linux Suspicious Executable)",
+        "family": "Linux Suspicious Executable",
+        "category": "TROJAN",
+        "severity": "HIGH",
+        "severityScore": "6/10",
+        "date": "2026-10-06",
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": "Static binary analysis and reverse engineering triage was conducted on sample 'a9795082ddfb5f57.bin' (Linux ELF Binary, 6037688 bytes). The sample is classified as Linux Suspicious Executable (Trojan) with an assessed threat severity score of 6/10. Forensic telemetry and binary structural decomposition have been cataloged for defensive detection and threat hunting.",
+        "tags": [
+            "TROJAN",
+            "LINUX SUSPICIOUS EXECUTABLE",
+            "SEVERITY_6",
+            "ELF"
+        ],
+        "mitre": [],
+        "iocs": [
+            {
+                "type": "sha256",
+                "value": "a9795082ddfb5f57e9068a7ca4ac4f1d2efcb7d2a45f40563d87c1ab786560b5",
+                "description": "Primary sample SHA-256"
+            },
+            {
+                "type": "md5",
+                "value": "55b331a4b6ce7c12fb115baa183f9bc7",
+                "description": "Primary sample MD5"
+            },
+            {
+                "type": "file_path",
+                "value": "/dev/nulH",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/proc/seH",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/etc/locH",
+                "description": "Discovered filesystem path"
+            }
+        ],
+        "behavior": {
+            "processTree": [
+                "Execution: Sample type: Linux ELF Binary"
+            ],
+            "droppedPayloads": []
+        },
+        "yaraRule": "rule Linux_Linux_Suspicious_Exe_a9795082 {\n    meta:\n        description = \"Detection rule for Linux Suspicious Executable (Trojan) - a9795082ddfb5f57e9068a7ca4ac4f1d2efcb7d2a45f40563d87c1ab786560b5\"\n        author = \"Hunter Threat Research Team\"\n        date = \"2026-10-06\"\n        hash = \"a9795082ddfb5f57e9068a7ca4ac4f1d2efcb7d2a45f40563d87c1ab786560b5\"\n        malware_family = \"Linux Suspicious Executable\"\n        severity = \"6/10\"\n    strings:\n        $elf_header = { 7F 45 4C 46 }\n    condition:\n        uint32(0) == 0x464c457f and\n        filesize >= 3622612 and filesize <= 9662348\n}"
+    },
+    {
         "id": "4323be148265ba895f7dd1054cd8522890288d855225ea80dcb47161ea43ca8f",
         "sha256": "4323be148265ba895f7dd1054cd8522890288d855225ea80dcb47161ea43ca8f",
         "title": "Threat Analysis Report: arm7 (Mirai Botnet)",
