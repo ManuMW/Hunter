@@ -5,6 +5,51 @@
 
 const THREAT_REPORTS = [
     {
+        "id": "0730cfb40dfc49e8b00344d72312c96832330b214c011d40fa338f3da2c84124",
+        "sha256": "0730cfb40dfc49e8b00344d72312c96832330b214c011d40fa338f3da2c84124",
+        "title": "Threat Analysis Report: ppc64 (Linux Suspicious Executable)",
+        "family": "Linux Suspicious Executable",
+        "category": "TROJAN",
+        "severity": "HIGH",
+        "severityScore": "6/10",
+        "date": "2026-10-07",
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": "Static binary analysis and reverse engineering triage was conducted on sample 'ppc64' (Linux ELF Binary, 6095010 bytes). The sample is classified as Linux Suspicious Executable (Trojan) with an assessed threat severity score of 6/10. Cryptographic deobfuscation successfully recovered concealed botnet command strings across 3 XOR key(s). Forensic telemetry and binary structural decomposition have been cataloged for defensive detection and threat hunting.",
+        "tags": [
+            "TROJAN",
+            "LINUX SUSPICIOUS EXECUTABLE",
+            "SEVERITY_6",
+            "ELF"
+        ],
+        "mitre": [
+            {
+                "id": "T1027",
+                "name": "Obfuscated Files or Information",
+                "tactic": "Defense Evasion"
+            }
+        ],
+        "iocs": [
+            {
+                "type": "sha256",
+                "value": "0730cfb40dfc49e8b00344d72312c96832330b214c011d40fa338f3da2c84124",
+                "description": "Primary sample SHA-256"
+            },
+            {
+                "type": "md5",
+                "value": "d9e33911ebc24b91cc356f46cdb429fc",
+                "description": "Primary sample MD5"
+            }
+        ],
+        "behavior": {
+            "processTree": [
+                "Defense Evasion: Extracted 3 XOR key(s): 0x2b, 0x53, 0x73"
+            ],
+            "droppedPayloads": []
+        },
+        "yaraRule": "rule Linux_Linux_Suspicious_Exe_0730cfb4 {\n    meta:\n        description = \"Detection rule for Linux Suspicious Executable (Trojan) - 0730cfb40dfc49e8b00344d72312c96832330b214c011d40fa338f3da2c84124\"\n        author = \"Hunter Threat Research Team\"\n        date = \"2026-10-07\"\n        hash = \"0730cfb40dfc49e8b00344d72312c96832330b214c011d40fa338f3da2c84124\"\n        malware_family = \"Linux Suspicious Executable\"\n        severity = \"6/10\"\n    strings:\n        $s1 = \"+-+k+;+$+++-+++/+++++++k+++++*+k+++++*+k++++++*{++++++*{+++++*+++++/+++/++++++$S+++++*$S+++++*$S+++++++O+++++++O+++++++/+++*+++.+++++++++++++*+++++++*+++++++\" ascii\n        $s2 = \".o+++++\" ascii\n        $s3 = \".o+++++*+++++*+++/+++++\" ascii\n        $s4 = \"QK+++++*+++++*+++-+++++s+++++++r+++++++r+++++++/\" ascii\n        $s5 = \"z+++-+++++++++++++++++++++++++++++++++++++++++++++++#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*+++,+++++++)+++++*$S++++++$S+++++++O+++++++++++++++/+++++++++++9+++,+++++++)+++++*$\" ascii\n        $s6 = \"+++++++++++++++/+++++++++++\" ascii\n    condition:\n        uint32(0) == 0x464c457f and\n        filesize >= 3657006 and filesize <= 9754064 and\n        2 of ($s*)\n}"
+    },
+    {
         "id": "a9795082ddfb5f57e9068a7ca4ac4f1d2efcb7d2a45f40563d87c1ab786560b5",
         "sha256": "a9795082ddfb5f57e9068a7ca4ac4f1d2efcb7d2a45f40563d87c1ab786560b5",
         "title": "Threat Analysis Report: a9795082ddfb5f57.bin (Linux Suspicious Executable)",
