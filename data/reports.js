@@ -5,6 +5,103 @@
 
 const THREAT_REPORTS = [
     {
+        "id": "9da6438ad7bc7057cb8e39d7b9a77c0e6bde105377e49f6270cb07ccd52c65a4",
+        "sha256": "9da6438ad7bc7057cb8e39d7b9a77c0e6bde105377e49f6270cb07ccd52c65a4",
+        "title": "Threat Analysis Report: 9da6438ad7bc7057cb8e39d7b9a77c0e6bde105377e49f6270cb07ccd52c65a4.elf (Mirai Botnet)",
+        "family": "Mirai Botnet",
+        "category": "BOTNET",
+        "severity": "CRITICAL",
+        "severityScore": "8/10",
+        "date": "2026-10-19",
+        "author": "Hunter Research Team",
+        "readTime": "4 min read",
+        "summary": "Static binary analysis and reverse engineering triage was conducted on sample '9da6438ad7bc7057cb8e39d7b9a77c0e6bde105377e49f6270cb07ccd52c65a4.elf' (Linux ELF Binary, 148223 bytes). The sample is classified as Mirai Botnet (Botnet) with an assessed threat severity score of 8/10. Static and deobfuscated indicator extraction revealed 1 external IP endpoints and 0 target URLs. Observed behavioral signatures include 2 SSH authentication markers and 0 automated scanning routines characteristic of distributed denial-of-service botnets. Forensic telemetry and binary structural decomposition have been cataloged for defensive detection and threat hunting.",
+        "tags": [
+            "BOTNET",
+            "MIRAI BOTNET",
+            "SEVERITY_8",
+            "ELF",
+            "MIRAI"
+        ],
+        "mitre": [
+            {
+                "id": "T1498",
+                "name": "Network Denial of Service",
+                "tactic": "Impact"
+            },
+            {
+                "id": "T1046",
+                "name": "Network Service Discovery",
+                "tactic": "Discovery"
+            },
+            {
+                "id": "T1110",
+                "name": "Brute Force",
+                "tactic": "Credential Access"
+            },
+            {
+                "id": "T1059.004",
+                "name": "Command and Scripting Interpreter: Unix Shell",
+                "tactic": "Execution"
+            },
+            {
+                "id": "T1071",
+                "name": "Application Layer Protocol",
+                "tactic": "Command and Control"
+            }
+        ],
+        "iocs": [
+            {
+                "type": "sha256",
+                "value": "9da6438ad7bc7057cb8e39d7b9a77c0e6bde105377e49f6270cb07ccd52c65a4",
+                "description": "Primary sample SHA-256"
+            },
+            {
+                "type": "md5",
+                "value": "df975b1adbbbbb97669fb727b8369281",
+                "description": "Primary sample MD5"
+            },
+            {
+                "type": "ip",
+                "value": "176.65.139.76",
+                "description": "Discovered external IP endpoint"
+            },
+            {
+                "type": "file_path",
+                "value": "/sys/devices/system/cpu",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/bin/busybox",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/usr/compress/bin/",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/bin/../cc/include",
+                "description": "Discovered filesystem path"
+            },
+            {
+                "type": "file_path",
+                "value": "/usr/libexec/openssh/sftp-server",
+                "description": "Discovered filesystem path"
+            }
+        ],
+        "behavior": {
+            "processTree": [
+                "Discovery: Identified 2 SSH references and 0 scan routines.",
+                "Command and Control: Discovered IP endpoints: 176.65.139.76"
+            ],
+            "droppedPayloads": []
+        },
+        "yaraRule": "rule Linux_Mirai_Botnet_9da6438a {\n    meta:\n        description = \"Detection rule for Mirai Botnet (Botnet) - 9da6438ad7bc7057cb8e39d7b9a77c0e6bde105377e49f6270cb07ccd52c65a4\"\n        author = \"Hunter Threat Research Team\"\n        date = \"2026-10-19\"\n        hash = \"9da6438ad7bc7057cb8e39d7b9a77c0e6bde105377e49f6270cb07ccd52c65a4\"\n        malware_family = \"Mirai Botnet\"\n        severity = \"8/10\"\n    strings:\n        $s1 = \"176.65.139.76\" ascii\n    condition:\n        uint32(0) == 0x464c457f and\n        filesize >= 88933 and filesize <= 239204 and\n        1 of ($s*)\n}"
+    },
+    {
         "id": "0730cfb40dfc49e8b00344d72312c96832330b214c011d40fa338f3da2c84124",
         "sha256": "0730cfb40dfc49e8b00344d72312c96832330b214c011d40fa338f3da2c84124",
         "title": "Threat Analysis Report: ppc64 (Linux Suspicious Executable)",
